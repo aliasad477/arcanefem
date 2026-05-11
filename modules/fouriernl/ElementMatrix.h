@@ -47,7 +47,7 @@ ARCCORE_HOST_DEVICE RealMatrix<3, 3> computeElementMatrixTria3Gpu(CellLocalId ce
   Real3 dyU = FemUtils::Gpu::FeOperation2D::computeGradientYTria3(cell_lid, cn_cv, in_node_coord);
 
   Real uk_cell = (in_node_uk[cn_cv.nodeId(cell_lid, 0)] + in_node_uk[cn_cv.nodeId(cell_lid, 1)] + in_node_uk[cn_cv.nodeId(cell_lid, 2)]) / 3.;
-  Real in_lambda = _lambdaGpu_m2(uk_cell);
+  Real in_lambda = _lambdaGpu(uk_cell);
 
   return area * in_lambda * (dxU ^ dxU) + area * in_lambda * (dyU ^ dyU);
 }
@@ -60,7 +60,7 @@ ARCCORE_HOST_DEVICE RealMatrix<1, 3> computeElementVectorTria3Gpu(CellLocalId ce
   Real3 dyU = FemUtils::Gpu::FeOperation2D::computeGradientYTria3(cell_lid, cn_cv, in_node_coord);
 
   Real uk_cell = (in_node_uk[cn_cv.nodeId(cell_lid, 0)] + in_node_uk[cn_cv.nodeId(cell_lid, 1)] + in_node_uk[cn_cv.nodeId(cell_lid, 2)]) / 3.;
-  Real in_lambda = _lambdaGpu_m2(uk_cell);
+  Real in_lambda = _lambdaGpu(uk_cell);
 
   Real3 node_vector_integral = area * in_lambda * dxU[node_lid] * dxU + area * in_lambda * dyU[node_lid] * dyU;
   return { node_vector_integral[0], node_vector_integral[1], node_vector_integral[2] };
@@ -102,7 +102,7 @@ ARCCORE_HOST_DEVICE RealMatrix<4, 4> computeElementMatrixTetra4Gpu(CellLocalId c
   Real4 dzU = Arcane::FemUtils::Gpu::FeOperation3D::computeGradientZTetra4(cell_lid, cn_cv, in_node_coord);
 
   Real uk_cell = (in_node_uk[cn_cv.nodeId(cell_lid, 0)] + in_node_uk[cn_cv.nodeId(cell_lid, 1)] + in_node_uk[cn_cv.nodeId(cell_lid, 2)] + in_node_uk[cn_cv.nodeId(cell_lid, 3)]) / 4.;
-  Real in_lambda = _lambdaGpu_m2(uk_cell);
+  Real in_lambda = _lambdaGpu(uk_cell);
 
   return volume * in_lambda * (dxU ^ dxU) + volume * in_lambda * (dyU ^ dyU) + volume * in_lambda  * (dzU ^ dzU);
 }
@@ -116,7 +116,7 @@ ARCCORE_HOST_DEVICE RealMatrix<1, 4> computeElementVectorTetra4Gpu(CellLocalId c
   Real4 dzU = Arcane::FemUtils::Gpu::FeOperation3D::computeGradientZTetra4(cell_lid, cn_cv, in_node_coord);
 
   Real uk_cell = (in_node_uk[cn_cv.nodeId(cell_lid, 0)] + in_node_uk[cn_cv.nodeId(cell_lid, 1)] + in_node_uk[cn_cv.nodeId(cell_lid, 2)] + in_node_uk[cn_cv.nodeId(cell_lid, 3)]) / 4.;
-  Real in_lambda = _lambdaGpu_m2(uk_cell);
+  Real in_lambda = _lambdaGpu(uk_cell);
 
   Real4 node_vector_integral = volume * in_lambda * dxU[node_lid] * dxU + volume * in_lambda * dyU[node_lid] * dyU + volume * in_lambda * dzU[node_lid] * dzU;
 

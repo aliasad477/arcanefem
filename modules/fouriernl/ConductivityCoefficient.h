@@ -44,5 +44,20 @@ inline Real FemModuleFourierNL::_lambdaCpu(const Real& u) {
  */
 /*---------------------------------------------------------------------------*/
 ARCCORE_HOST_DEVICE inline Real _lambdaGpu_m2(const Real& u) {
-  return LAMBDA_CONDUCTIVITY_COEFFICIENT(u, 2.);
+  // return LAMBDA_CONDUCTIVITY_COEFFICIENT(u, 2.);
+  return (1.0 + 2.0 * u + u * u);
+}
+
+ARCCORE_HOST_DEVICE inline Real _lambdaGpu_m0(const Real& u) {
+  return 1.0;
+}
+
+ARCCORE_HOST_DEVICE inline Real _lambdaGpu_m5(const Real& u) {
+  return LAMBDA_CONDUCTIVITY_COEFFICIENT(u, 5.);
+}
+
+ARCCORE_HOST_DEVICE inline Real _lambdaGpu(const Real& u) {
+  // return _lambdaGpu_m0(u);
+  return _lambdaGpu_m2(u);
+  // return _lambdaGpu_m5(u);
 }
