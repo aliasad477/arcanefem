@@ -1,6 +1,6 @@
 # Solving a nonlinear Fourier equation with FEM and Arcane #
 
-<img width="300" align="center" src="https://github.com/user-attachments/assets/1e46ddac-103e-4c6f-8e8c-120125aa345a" />
+<img width="1787" height="693" alt="3D-compare-m2-fouriernlin1" src="https://github.com/user-attachments/assets/8c09f593-d9b8-4026-a043-93650af48f4d" />
 
 Here a nonlinear Fourier equation, that governs steady state heat conduction is solved using FEM in Arcane. The code here is a simple 2D unstructured mesh Galerkin FEM solver.
 
@@ -21,12 +21,12 @@ The nonlinearity in the above equation is due to the coefficient $\lambda(T)$.
 
 To complete the problem description, two first type (Dirichlet) boundary conditions are applied to this problem:
 
-- $T = 0.0 &deg C \quad \forall(x,y)\in\partial\Omega^h_{\text{left}}\subset\partial \Omega^h,$ and
-
-- $T = 1.0 &deg C \quad \forall(x,y)\in\partial\Omega^h_{\text{right}}\subset\partial \Omega^h,$ 
+$$T = 0.0 &deg C \quad \forall(x,y)\in\partial\Omega^h_{\text{left}}\subset\partial \Omega^h,$$ and
+$$T = 1.0 &deg C \quad \forall(x,y)\in\partial\Omega^h_{\text{right}}\subset\partial \Omega^h,$$ 
 
 in addition, all other boundaries $\partial \Omega^h_{N} = \partial \Omega^h \setminus (\partial\Omega^h_{\text{left}} \cup \partial\Omega^h_{\text{right}})$ are exposed to second type (Neumann) boundary condition:
-- $\lambda(T) \nabla T \cdot \mathbf{n}|_{\partial \Omega^h_{N} } = \overline{q} \cdot \mathbf{n}|_{\partial \Omega^h_{N} } = 0$
+
+$$\lambda(T) \nabla T \cdot \mathbf{n}|_{\partial \Omega^h_{N} } = \overline{q} \cdot \mathbf{n}|_{\partial \Omega^h_{N} } = 0$$
 
 Finally, the heat-source term is set to zero
 
@@ -119,7 +119,7 @@ The Dirichlet (constant temperature) boundary conditions  are provided in `Test.
     </boundary-conditions>
 ```
 
-So in the snippet above, three Dirichlet conditions are applied ($0 &deg C, 1.0 &deg C)  on two borders ('left' and 'right').
+So in the snippet above, three Dirichlet conditions are applied ($0 \degree C, 1.0 \degree C$)  on two borders ('left' and 'right').
 
 The natural Neumann boundary conditions are not explicitly provided.
 
@@ -130,4 +130,5 @@ For post processing the `Mesh0.hdf` file is outputted (in `output/depouillement/
 
 ## Validation ##    
 For $m=2$, we compare the analytical solution ```T_exact``` with the solution obtained with FEM method ```T``` along the diagonal of the square domain.
-![fourier_nonlin_cond_validation.png](fourier_nonlin_cond_validation.png)
+<img alt="temp-profile-compare-m2-fouriernlin" src="https://github.com/user-attachments/assets/e3c0f4a3-37d6-4a35-861a-362a93358349" />
+
