@@ -126,8 +126,7 @@ class FemModuleElastoplasticity
 
   bool m_nonlinear_law = false;
   bool m_newton_solver_converged = false;
-  bool m_evaluate_residual_with_increment = false;
-  bool m_check_bilinear_operator_for_residual = false;
+  bool m_check_with_bilinear_operator = false;
 
   void _getMaterialParameters();
   void _solveLinear();

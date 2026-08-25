@@ -5,7 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //-----------------------------------------------------------------------------
 /*---------------------------------------------------------------------------*/
-/* ResidualRHS.h                                                (C) 2000-2026 */
+/* InternalBodyForceRHS.h                                                (C) 2000-2026 */
 /*                                                                           */
 /* Contains functions to compute and assemble source term contribution to RHS*/
 /*---------------------------------------------------------------------------*/
@@ -13,7 +13,8 @@
 
 /*---------------------------------------------------------------------------*/
 /**
- * @brief Applies nonlinear residual term to RHS vector of the linear system.
+ * @brief Applies nonlinear internal body force term to RHS vector of
+ * the linear system.
  * 
  * @param rhs_values The variable representing the RHS vector to be updated.
  * @param node_dof The connectivity view mapping nodes to their corresponding
@@ -84,20 +85,20 @@ _applyInternalBodyForce(VariableDoFReal& rhs_values, const IndexedNodeDoFConnect
 /*---------------------------------------------------------------------------*/
 
 ARCCORE_HOST_DEVICE inline RealVector<6>
-computeResidualTria3Base(Real3 dxu,
+computeInternalBodyForceTria3Base(Real3 dxu,
                          Real3 dyu,
                          Real area,
                          RealMatrix<3, 3> C_2d,
                          Real3x3 grad_U,
                          RealVector<6> Uk = {0.,0.,0.,0.,0.,0.},
-                         bool check_bilinear_operator_for_residual=false)
+                         bool check_with_bilinear_operator=false)
 {
   RealVector<6> epsxx = { dxu[0], 0., dxu[1], 0., dxu[2], 0. };
   RealVector<6> epsyy = { 0., dyu[0], 0., dyu[1], 0., dyu[2] };
   RealVector<6> epsxy = { dyu[0], dxu[0], dyu[1], dxu[1], dyu[2], dxu[2] };
 
   RealVector<6> rhs;
-  if (check_bilinear_operator_for_residual) {
+  if (check_with_bilinear_operator) {
     //----------------------------------------------------------------------
     //  ∫∫∫ (ε(𝑈):𝐶) ⊙ ε(𝐯) = ∫∫∫ (𝑈 ε(𝘶):𝐶) ⊗ ε(𝐯)
     //----------------------------------------------------------------------
@@ -141,6 +142,7 @@ _applyInternalBodyForceTria3Gpu(VariableDoFReal& rhs_values,
                           const VariableNodeReal3& node_coord,
                           IMesh* mesh, RunQueue* queue)
 {
+  info() << "[ArcaneFem-Info] Started module  _applyInternalBodyForceTria3Gpu()";
   ARCANE_CHECK_PTR(queue);
   ARCANE_CHECK_PTR(mesh);
 
@@ -159,7 +161,6 @@ _applyInternalBodyForceTria3Gpu(VariableDoFReal& rhs_values,
   auto in_u  = Accelerator::viewIn(command, m_U);
   auto in_du = Accelerator::viewIn(command, m_dU);
   auto in_C_2d = Accelerator::viewIn(command, m_C_2d_cell);
-  auto evaluate_residual_with_increment = m_evaluate_residual_with_increment;
   Real lambda_cell = lambda;
   Real mu_cell = mu;
 
@@ -182,14 +183,9 @@ _applyInternalBodyForceTria3Gpu(VariableDoFReal& rhs_values,
       C_2d(2, 1) = 0.;
       C_2d(2, 2) = mu_cell;
 
-      Real3x3 grad_U;
-      if (evaluate_residual_with_increment) {
-        grad_U = Arcane::FemUtils::Gpu::FeOperation2D::computeGradientTria3(cell_lid, cn_cv, in_node_coord, in_du);
-      } else {
-        grad_U = Arcane::FemUtils::Gpu::FeOperation2D::computeGradientTria3(cell_lid, cn_cv, in_node_coord, in_u);
-      }
+      Real3x3 grad_U = Arcane::FemUtils::Gpu::FeOperation2D::computeGradientTria3(cell_lid, cn_cv, in_node_coord, in_u);
 
-      RealVector<6> rhs = computeResidualTria3Base(dxu, dyu, area, C_2d, grad_U);
+      RealVector<6> rhs = computeInternalBodyForceTria3Base(dxu, dyu, area, C_2d, grad_U);
 
       NodeLocalId cell_nodes[3];
       Int32 index = 0;
@@ -215,12 +211,7 @@ _applyInternalBodyForceTria3Gpu(VariableDoFReal& rhs_values,
       Real3 dxu = Arcane::FemUtils::Gpu::FeOperation2D::computeGradientXTria3(cell_lid, cn_cv, in_node_coord);
       Real3 dyu = Arcane::FemUtils::Gpu::FeOperation2D::computeGradientYTria3(cell_lid, cn_cv, in_node_coord);
 
-      Real3x3 grad_U;
-      if (evaluate_residual_with_increment) {
-        grad_U = Arcane::FemUtils::Gpu::FeOperation2D::computeGradientTria3(cell_lid, cn_cv, in_node_coord, in_du);
-      } else {
-        grad_U = Arcane::FemUtils::Gpu::FeOperation2D::computeGradientTria3(cell_lid, cn_cv, in_node_coord, in_u);
-      }
+      Real3x3 grad_U = Arcane::FemUtils::Gpu::FeOperation2D::computeGradientTria3(cell_lid, cn_cv, in_node_coord, in_u);
 
       RealMatrix<3, 3> C_2d;
       C_2d(0, 0) = in_C_2d(cell_lid, 0, 0);
@@ -233,7 +224,7 @@ _applyInternalBodyForceTria3Gpu(VariableDoFReal& rhs_values,
       C_2d(2, 1) = in_C_2d(cell_lid, 2, 1);
       C_2d(2, 2) = in_C_2d(cell_lid, 2, 2);
 
-      RealVector<6> rhs = computeResidualTria3Base(dxu, dyu, area, C_2d, grad_U);
+      RealVector<6> rhs = computeInternalBodyForceTria3Base(dxu, dyu, area, C_2d, grad_U);
 
       NodeLocalId cell_nodes[3];
       Int32 index = 0;
@@ -257,6 +248,8 @@ _applyInternalBodyForceTria3Gpu(VariableDoFReal& rhs_values,
 inline void FemModuleElastoplasticity::
 _applyInternalBodyForceTria3Cpu(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof)
 {
+  info() << "[ArcaneFem-Info] Started module  _applyInternalBodyForceTria3Cpu()";
+
   ENUMERATE_ (Cell, icell, allCells()) {
     Cell cell = *icell;
     Real area = ArcaneFemFunctions::MeshOperation::computeAreaTria3(cell, m_node_coord);
@@ -270,31 +263,19 @@ _applyInternalBodyForceTria3Cpu(VariableDoFReal& rhs_values, const IndexedNodeDo
       std::memcpy(&C_2d(0,0), &m_C_2d_cell(cell, 0, 0), 3 * 3 * sizeof(Real));
     }
 
-    Real3x3 grad_U;
-    if (m_evaluate_residual_with_increment) {
-      grad_U = ArcaneFemFunctions::FeOperation2D::computeGradientTria3(cell, m_node_coord, m_dU);
-    } else {
-      grad_U = ArcaneFemFunctions::FeOperation2D::computeGradientTria3(cell, m_node_coord, m_U);
-    }
+    Real3x3 grad_U = ArcaneFemFunctions::FeOperation2D::computeGradientTria3(cell, m_node_coord, m_U);
 
-    RealVector<6> rhs = computeResidualTria3Base(dxu, dyu, area, C_2d, grad_U);
+    RealVector<6> rhs = computeInternalBodyForceTria3Base(dxu, dyu, area, C_2d, grad_U);
 
-    if (m_check_bilinear_operator_for_residual) {
+    if (m_check_with_bilinear_operator) {
       //----------------------------------------------------------------------
       //  ∫∫∫ (ε(𝑈):𝐶) ⊙ ε(𝐯) = ∫∫∫ (𝑈 ε(𝘶):𝐶) ⊗ ε(𝐯)
       //----------------------------------------------------------------------
-      RealVector<6> Uk;
-      if (m_evaluate_residual_with_increment) {
-        Uk = { m_dU[cell.nodeId(0)].x, m_dU[cell.nodeId(0)].y,
-                  m_dU[cell.nodeId(1)].x, m_dU[cell.nodeId(1)].y,
-                  m_dU[cell.nodeId(2)].x, m_dU[cell.nodeId(2)].y};
-      } else {
-        Uk = { m_U[cell.nodeId(0)].x, m_U[cell.nodeId(0)].y,
-                  m_U[cell.nodeId(1)].x, m_U[cell.nodeId(1)].y,
-                  m_U[cell.nodeId(2)].x, m_U[cell.nodeId(2)].y};
-      }
+      RealVector<6> Uk = {m_U[cell.nodeId(0)].x, m_U[cell.nodeId(0)].y,
+                          m_U[cell.nodeId(1)].x, m_U[cell.nodeId(1)].y,
+                          m_U[cell.nodeId(2)].x, m_U[cell.nodeId(2)].y};
 
-      RealVector<6> rhs_1 =  computeResidualTria3Base(dxu, dyu, area, C_2d, grad_U,
+      RealVector<6> rhs_1 =  computeInternalBodyForceTria3Base(dxu, dyu, area, C_2d, grad_U,
                                                       Uk,true);
       Real diff = 0.0;
       Real maxx = 0.0;
@@ -365,11 +346,8 @@ _applyInternalBodyForceQuad4(VariableDoFReal& rhs_values, const IndexedNodeDoFCo
         RealVector<8> epsxy = { dyu(0), dxu(0), dyu(1), dxu(1), dyu(2), dxu(2), dyu(3), dxu(3) };
 
         Real3x3 grad_U;
-        if (m_evaluate_residual_with_increment) {
-          grad_U = ArcaneFemFunctions::FeOperation2D::computeGradientQuad4(cell, m_node_coord, m_dU, xi, eta);
-        } else {
-          grad_U = ArcaneFemFunctions::FeOperation2D::computeGradientQuad4(cell, m_node_coord, m_U, xi, eta);
-        }
+        grad_U = ArcaneFemFunctions::FeOperation2D::computeGradientQuad4(cell, m_node_coord, m_U, xi, eta);
+
         Real epsxx_U = grad_U(0, 0);
         Real epsyy_U = grad_U(1, 1);
         Real epsxy_U = grad_U(0, 1) + grad_U(1, 0);
@@ -386,22 +364,15 @@ _applyInternalBodyForceQuad4(VariableDoFReal& rhs_values, const IndexedNodeDoFCo
 
         RealVector<8> rhs = - integration_weight * ( sigmaxx_U * epsxx + sigmayy_U * epsyy + sigmaxy_U * epsxy);
 
-        if (m_check_bilinear_operator_for_residual) {
+        if (m_check_with_bilinear_operator) {
           //----------------------------------------------------------------------
           //  ∫∫∫ (ε(𝑈):𝐶) ⊙ ε(𝐯) = ∫∫∫ (𝑈 ε(𝘶):𝐶) ⊗ ε(𝐯)
           //----------------------------------------------------------------------
           RealVector<8> Uk;
-          if (m_evaluate_residual_with_increment) {
-            Uk = { m_dU[cell.nodeId(0)].x, m_dU[cell.nodeId(0)].y,
-                      m_dU[cell.nodeId(1)].x, m_dU[cell.nodeId(1)].y,
-                      m_dU[cell.nodeId(2)].x, m_dU[cell.nodeId(2)].y,
-                      m_dU[cell.nodeId(3)].x, m_dU[cell.nodeId(3)].y};
-          } else {
-            Uk = { m_U[cell.nodeId(0)].x, m_U[cell.nodeId(0)].y,
-                      m_U[cell.nodeId(1)].x, m_U[cell.nodeId(1)].y,
-                      m_U[cell.nodeId(2)].x, m_U[cell.nodeId(2)].y,
-                      m_U[cell.nodeId(3)].x, m_U[cell.nodeId(3)].y};
-          }
+          Uk = { m_U[cell.nodeId(0)].x, m_U[cell.nodeId(0)].y,
+                    m_U[cell.nodeId(1)].x, m_U[cell.nodeId(1)].y,
+                    m_U[cell.nodeId(2)].x, m_U[cell.nodeId(2)].y,
+                    m_U[cell.nodeId(3)].x, m_U[cell.nodeId(3)].y};
           RealVector<8> rhs_1 = - integration_weight *
                         (  Uk * (( C_2d( 0, 0) * epsxx
                                  + C_2d( 0, 1) * epsyy
@@ -469,11 +440,7 @@ _applyInternalBodyForceTetra4(VariableDoFReal& rhs_values, const IndexedNodeDoFC
     RealVector<12> epsxy = { dyu[0], dxu[0], 0.,    dyu[1], dxu[1], 0.,    dyu[2], dxu[2], 0.,    dyu[3], dxu[3], 0. };
 
     Real3x3 grad_U;
-    if (m_evaluate_residual_with_increment) {
-      grad_U = ArcaneFemFunctions::FeOperation3D::computeGradientTetra4(cell, m_node_coord, m_dU);
-    } else {
-      grad_U = ArcaneFemFunctions::FeOperation3D::computeGradientTetra4(cell, m_node_coord, m_U);
-    }
+    grad_U = ArcaneFemFunctions::FeOperation3D::computeGradientTetra4(cell, m_node_coord, m_U);
     Real epsxx_U = grad_U(0, 0);
     Real epsyy_U = grad_U(1, 1);
     Real epszz_U = grad_U(2, 2);
@@ -522,22 +489,16 @@ _applyInternalBodyForceTetra4(VariableDoFReal& rhs_values, const IndexedNodeDoFC
                                     + sigmayz_U * epsyz + sigmazx_U * epszx + sigmaxy_U * epsxy);
 
     RealVector<12> rhs_1;
-    if (m_check_bilinear_operator_for_residual || true){ // TODO check why the grad method for tetra does not work *crying*
+    if (m_check_with_bilinear_operator || true){ // TODO check why the grad method for tetra does not work *crying*
       //----------------------------------------------------------------------
       //  ∫∫∫ (ε(𝑈):𝐶) ⊙ ε(𝐯) = ∫∫∫ (𝑈 ε(𝘶):𝐶) ⊗ ε(𝐯)
       //----------------------------------------------------------------------
       RealVector<12> Uk;
-      if (m_evaluate_residual_with_increment) {
-        Uk = { m_dU[cell.nodeId(0)].x, m_dU[cell.nodeId(0)].y, m_dU[cell.nodeId(0)].z,
-                  m_dU[cell.nodeId(1)].x, m_dU[cell.nodeId(1)].y, m_dU[cell.nodeId(1)].z,
-                  m_dU[cell.nodeId(2)].x, m_dU[cell.nodeId(2)].y, m_dU[cell.nodeId(2)].z,
-                  m_dU[cell.nodeId(3)].x, m_dU[cell.nodeId(3)].y, m_dU[cell.nodeId(3)].z};
-      } else {
-        Uk = { m_U[cell.nodeId(0)].x, m_U[cell.nodeId(0)].y, m_U[cell.nodeId(0)].z,
-                  m_U[cell.nodeId(1)].x, m_U[cell.nodeId(1)].y, m_U[cell.nodeId(1)].z,
-                  m_U[cell.nodeId(2)].x, m_U[cell.nodeId(2)].y, m_U[cell.nodeId(2)].z,
-                  m_U[cell.nodeId(3)].x, m_U[cell.nodeId(3)].y, m_U[cell.nodeId(3)].z};
-      }
+      Uk = { m_U[cell.nodeId(0)].x, m_U[cell.nodeId(0)].y, m_U[cell.nodeId(0)].z,
+                m_U[cell.nodeId(1)].x, m_U[cell.nodeId(1)].y, m_U[cell.nodeId(1)].z,
+                m_U[cell.nodeId(2)].x, m_U[cell.nodeId(2)].y, m_U[cell.nodeId(2)].z,
+                m_U[cell.nodeId(3)].x, m_U[cell.nodeId(3)].y, m_U[cell.nodeId(3)].z};
+
       rhs_1 = - volume *
                              (Uk * (( C_3d( 0, 0) * epsxx
                                     + C_3d( 0, 1) * epsyy
@@ -676,11 +637,8 @@ _applyInternalBodyForceHexa8(VariableDoFReal& rhs_values, const IndexedNodeDoFCo
                                    dyu(6), dxu(6), 0.,    dyu(7), dxu(7), 0. };
 
           Real3x3 grad_U;
-          if (m_evaluate_residual_with_increment) {
-            grad_U = ArcaneFemFunctions::FeOperation3D::computeGradientHexa8(cell, m_node_coord, m_dU, xi, eta, zeta);
-          } else {
-            grad_U = ArcaneFemFunctions::FeOperation3D::computeGradientHexa8(cell, m_node_coord, m_U, xi, eta, zeta);
-          }
+          grad_U = ArcaneFemFunctions::FeOperation3D::computeGradientHexa8(cell, m_node_coord, m_U, xi, eta, zeta);
+
           Real epsxx_U = grad_U(0, 0);
           Real epsyy_U = grad_U(1, 1);
           Real epszz_U = grad_U(2, 2);
@@ -728,30 +686,18 @@ _applyInternalBodyForceHexa8(VariableDoFReal& rhs_values, const IndexedNodeDoFCo
           RealVector<24> rhs = - integration_weight * ( sigmaxx_U * epsxx + sigmayy_U * epsyy + sigmazz_U * epszz
                                                       + sigmayz_U * epsyz + sigmazx_U * epszx + sigmaxy_U * epsxy);
 
-          if (m_check_bilinear_operator_for_residual) {
+          if (m_check_with_bilinear_operator) {
             //----------------------------------------------------------------------
             //  ∫∫∫ (ε(𝑈):𝐶) ⊙ ε(𝐯) = ∫∫∫ (𝑈 ε(𝘶):𝐶) ⊗ ε(𝐯)
             //----------------------------------------------------------------------
-            RealVector<24> Uk;
-            if (m_evaluate_residual_with_increment){
-              Uk = {m_dU[cell.nodeId(0)].x, m_dU[cell.nodeId(0)].y, m_dU[cell.nodeId(0)].z,
-                       m_dU[cell.nodeId(1)].x, m_dU[cell.nodeId(1)].y, m_dU[cell.nodeId(1)].z,
-                       m_dU[cell.nodeId(2)].x, m_dU[cell.nodeId(2)].y, m_dU[cell.nodeId(2)].z,
-                       m_dU[cell.nodeId(3)].x, m_dU[cell.nodeId(3)].y, m_dU[cell.nodeId(3)].z,
-                       m_dU[cell.nodeId(4)].x, m_dU[cell.nodeId(4)].y, m_dU[cell.nodeId(4)].z,
-                       m_dU[cell.nodeId(5)].x, m_dU[cell.nodeId(5)].y, m_dU[cell.nodeId(5)].z,
-                       m_dU[cell.nodeId(6)].x, m_dU[cell.nodeId(6)].y, m_dU[cell.nodeId(6)].z,
-                       m_dU[cell.nodeId(7)].x, m_dU[cell.nodeId(7)].y, m_dU[cell.nodeId(7)].z };
-            } else {
-              Uk = { m_U[cell.nodeId(0)].x, m_U[cell.nodeId(0)].y, m_U[cell.nodeId(0)].z,
-                       m_U[cell.nodeId(1)].x, m_U[cell.nodeId(1)].y, m_U[cell.nodeId(1)].z,
-                       m_U[cell.nodeId(2)].x, m_U[cell.nodeId(2)].y, m_U[cell.nodeId(2)].z,
-                       m_U[cell.nodeId(3)].x, m_U[cell.nodeId(3)].y, m_U[cell.nodeId(3)].z,
-                       m_U[cell.nodeId(4)].x, m_U[cell.nodeId(4)].y, m_U[cell.nodeId(4)].z,
-                       m_U[cell.nodeId(5)].x, m_U[cell.nodeId(5)].y, m_U[cell.nodeId(5)].z,
-                       m_U[cell.nodeId(6)].x, m_U[cell.nodeId(6)].y, m_U[cell.nodeId(6)].z,
-                       m_U[cell.nodeId(7)].x, m_U[cell.nodeId(7)].y, m_U[cell.nodeId(7)].z };
-            }
+            RealVector<24> Uk = {m_U[cell.nodeId(0)].x, m_U[cell.nodeId(0)].y, m_U[cell.nodeId(0)].z,
+                                 m_U[cell.nodeId(1)].x, m_U[cell.nodeId(1)].y, m_U[cell.nodeId(1)].z,
+                                 m_U[cell.nodeId(2)].x, m_U[cell.nodeId(2)].y, m_U[cell.nodeId(2)].z,
+                                 m_U[cell.nodeId(3)].x, m_U[cell.nodeId(3)].y, m_U[cell.nodeId(3)].z,
+                                 m_U[cell.nodeId(4)].x, m_U[cell.nodeId(4)].y, m_U[cell.nodeId(4)].z,
+                                 m_U[cell.nodeId(5)].x, m_U[cell.nodeId(5)].y, m_U[cell.nodeId(5)].z,
+                                 m_U[cell.nodeId(6)].x, m_U[cell.nodeId(6)].y, m_U[cell.nodeId(6)].z,
+                                 m_U[cell.nodeId(7)].x, m_U[cell.nodeId(7)].y, m_U[cell.nodeId(7)].z };
 
             RealVector<24> rhs_1 = - integration_weight *
                           ( Uk * ((  C_3d( 0, 0) * epsxx

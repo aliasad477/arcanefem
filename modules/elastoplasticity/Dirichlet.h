@@ -201,7 +201,7 @@ void FemModuleElastoplasticity::_assembleDirichletsNewtonGpu()
           if (bs->getEnforceDirichletMethod() == "Penalty") {
             Real penalty = bs->getPenalty();
             ARCANE_CHECK_PTR(queue);
-            ARCANE_CHECK_PTR(mesh);
+            ARCANE_CHECK_PTR(mesh_ptr);
 
             NodeInfoListView nodes_infos(mesh_ptr->nodeFamily());
             auto node_dof(m_dofs_on_nodes.nodeDoFConnectivityView());

@@ -17,10 +17,10 @@
 #include "FemModule.h"
 #include "ElementMatrix.h"
 #include "ElementMatrixHexQuad.h"
-#include "BodyForce.h"
+#include "ExternalBodyForce.h"
 #include "Traction.h"
 #include "Dirichlet.h"
-#include "NLResidualRHS.h"
+#include "InternalBodyForce.h"
 
 /*---------------------------------------------------------------------------*/
 /**
@@ -60,7 +60,7 @@ startInit()
                            options()->linearSystem.serviceName() == "AlephLinearSystem");
   //
   m_gp_material_tensor_strategy = options()->gpMaterialTensorStrategy();
-  m_check_bilinear_operator_for_residual = options()->checkBilinearOperatorForResidual();
+  m_check_with_bilinear_operator = options()->checkBilinearOperatorForResidual();
 
   if (m_gp_material_tensor_strategy == "global") {
     if (mesh()->dimension() == 2) {
@@ -274,7 +274,7 @@ _solveNewton()
       m_newton_solver_converged = false;
       break;
     } else {
-      _updateGuessFromIncrement(); //TODO check if m_linear_solve keeps the previous solution
+      _updateGuessFromIncrement(); // TODO remove if m_linear_solve keeps the previous solution
     }
   }
 
@@ -426,7 +426,6 @@ _assembleLinearOperator()
   _applyTraction(rhs_values, node_dof);
 
   if (m_nonlinear_law) {
-    m_evaluate_residual_with_increment = false;
     _applyInternalBodyForce(rhs_values, node_dof);
     _applyDirichletNewton(rhs_values, node_dof);
    } else {
@@ -815,12 +814,7 @@ _checkNewtonConvergence()
   Real convergence_error_increment = l2_norm_du / (m_newton_rtol * l2_norm_u  + m_newton_atol);
 
   VariableDoFReal& residual_values(m_linear_system.rhsVariable());
-  residual_values.fill(0.0);
   auto node_dof(m_dofs_on_nodes.nodeDoFConnectivityView());
-
-  m_evaluate_residual_with_increment = true;
-  _applyInternalBodyForce(residual_values, node_dof); // -F_int(du)
-
   Real l2_norm_rhs = 0.0;
   {
     ENUMERATE_ (Node, inode, ownNodes()) {
@@ -839,30 +833,10 @@ _checkNewtonConvergence()
   l2_norm_rhs = pm->reduce(Parallel::ReduceSum, l2_norm_rhs);
   residual_norm = math::sqrt(l2_norm_rhs);
 
-  VariableDoFReal& residual_values3(m_linear_system.rhsVariable());
-  Real l2_norm_rhs3 = 0.0;
-  {
-    ENUMERATE_ (Node, inode, ownNodes()) {
-      Real norm_residual3 = 0.0;
-      if (mesh()->dimension() == 2) {
-        norm_residual3 =  math::pow(residual_values3[node_dof.dofId(inode, 0)], 2.0)
-                  + math::pow(residual_values3[node_dof.dofId(inode, 1)], 2.0);
-      } else {
-        norm_residual3 =  math::pow(residual_values3[node_dof.dofId(inode, 0)], 2.0)
-                  + math::pow(residual_values3[node_dof.dofId(inode, 1)], 2.0)
-                  + math::pow(residual_values3[node_dof.dofId(inode, 2)], 2.0);
-      }
-      l2_norm_rhs3 += norm_residual3;
-    }
-  }
-  l2_norm_rhs3 = pm->reduce(Parallel::ReduceSum, l2_norm_rhs3);
-  Real residual_norm3 = math::sqrt(l2_norm_rhs3);
-
   // The OR criterion follows petsc SNES
   m_newton_solver_converged = (convergence_error_increment <= 1.0 || (m_newton_iter + 1 > 0 && residual_norm <= m_newton_atol));
 
-  info() << "[ArcaneFem-Info] At newton iteration "<< m_newton_iter <<": ||X_k+1 - X_k||/||X_k|| = " << increment_norm << " and ||F(dX_k)|| = " << residual_norm << " => " << (m_newton_solver_converged ? "CONVERGED" : "NOT CONVERGED");
-  info() << "[ArcaneFem-Info] At newton iteration "<< m_newton_iter <<": ||X_k+1 - X_k||/||X_k|| = " << increment_norm << " and ||(F_ext - F(X_k))|| = " << residual_norm3 << " => " << (m_newton_solver_converged ? "CONVERGED" : "NOT CONVERGED");
+  info() << "[ArcaneFem-Info] At newton iteration "<< m_newton_iter <<": ||X_k+1 - X_k||/||X_k|| = " << increment_norm << " and ||(F_ext - F_int(X_k))|| = " << residual_norm << " => " << (m_newton_solver_converged ? "CONVERGED" : "NOT CONVERGED");
 
   elapsedTime = platform::getRealTime() - elapsedTime;
   ArcaneFemFunctions::GeneralFunctions::printArcaneFemTime(traceMng(), "check-newton-convergence", elapsedTime);
