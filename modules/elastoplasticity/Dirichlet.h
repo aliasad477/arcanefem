@@ -110,20 +110,25 @@ _applyDirichletNewton(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectiv
       for (Int32 dof_index = 0; dof_index < u_dirichlet_string.size(); ++dof_index) {
         if (u_dirichlet_string[dof_index] != "NULL") {
 
-          Real value = 0.0;
-          if (m_newton_iter == 0) {
-            value = std::stod(u_dirichlet_string[dof_index].localstr());
-          }
-
+          Real value = std::stod(u_dirichlet_string[dof_index].localstr());
           if (bs->getEnforceDirichletMethod() == "Penalty") {
             Real penalty = bs->getPenalty();
-            ArcaneFemFunctions::BoundaryConditionsHelpers::applyDirichletToNodeGroupViaPenalty(dof_index, value, penalty, node_dof, m_linear_system, rhs_values, node_group);
+            ENUMERATE_ (Node, inode, node_group) {
+              Node node = *inode;
+              if (node.isOwn()) {
+                m_linear_system.matrixSetValue(node_dof.dofId(node, dof_index), node_dof.dofId(node, dof_index), penalty);
+                Real u_g = penalty * (value - m_U[node][dof_index]);
+                rhs_values[node_dof.dofId(node, dof_index)] = u_g;
+              }
+            }
           }
           else if (bs->getEnforceDirichletMethod() == "RowElimination") {
-            ArcaneFemFunctions::BoundaryConditionsHelpers::applyDirichletToNodeGroupViaRowElimination(dof_index, value, node_dof, m_linear_system, rhs_values, node_group);
+            Real value0 = 0.0;
+            ArcaneFemFunctions::BoundaryConditionsHelpers::applyDirichletToNodeGroupViaRowElimination(dof_index, value0, node_dof, m_linear_system, rhs_values, node_group);
           }
           else if (bs->getEnforceDirichletMethod() == "RowColumnElimination") {
-            ArcaneFemFunctions::BoundaryConditionsHelpers::applyDirichletToNodeGroupViaRowColumnElimination(dof_index, value, node_dof, m_linear_system, rhs_values, node_group);
+            Real value0 = 0.0;
+            ArcaneFemFunctions::BoundaryConditionsHelpers::applyDirichletToNodeGroupViaRowColumnElimination(dof_index, value0, node_dof, m_linear_system, rhs_values, node_group);
           }
           else {
             ARCANE_FATAL("Unknown Dirichlet method");
@@ -131,7 +136,6 @@ _applyDirichletNewton(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectiv
         }
       }
     }
-      // ArcaneFemFunctions::BoundaryConditions::applyDirichletToLhsAndRhs(bs, node_dof, m_linear_system, rhs_values);
 
     for (BC::IDirichletPointCondition* bs : bc->dirichletPointConditions()) {
       NodeGroup node_group = bs->getNode();
@@ -158,7 +162,6 @@ _applyDirichletNewton(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectiv
         }
       }
     }
-      // ArcaneFemFunctions::BoundaryConditions::applyPointDirichletToLhsAndRhs(bs, node_dof, m_linear_system, rhs_values);
   }
 }
 
@@ -194,19 +197,38 @@ void FemModuleElastoplasticity::_assembleDirichletsNewtonGpu()
 
       for (Int32 dof_index = 0; dof_index < u_dirichlet_string.size(); ++dof_index) {
         if (u_dirichlet_string[dof_index] != "NULL") {
-          Real value = 0.0;
-          if (m_newton_iter == 0) {
-            value = std::stod(u_dirichlet_string[dof_index].localstr());
-          }
+          Real value = std::stod(u_dirichlet_string[dof_index].localstr());
           if (bs->getEnforceDirichletMethod() == "Penalty") {
             Real penalty = bs->getPenalty();
-            Gpu::BoundaryConditionsHelpers::applyDirichletToNodeGroupViaPenalty(dof_index, value, penalty, queue, mesh_ptr, m_linear_system, m_dofs_on_nodes, node_group);
+            ARCANE_CHECK_PTR(queue);
+            ARCANE_CHECK_PTR(mesh);
+
+            NodeInfoListView nodes_infos(mesh_ptr->nodeFamily());
+            auto node_dof(m_dofs_on_nodes.nodeDoFConnectivityView());
+
+            auto command = makeCommand(queue);
+            auto in_out_forced_info = viewInOut(command, m_linear_system.getForcedInfo());
+            auto in_out_forced_value = viewInOut(command, m_linear_system.getForcedValue());
+            auto in_out_rhs_variable = viewInOut(command, m_linear_system.rhsVariable());
+            auto in_u = viewIn(command, m_U);
+
+            command << RUNCOMMAND_ENUMERATE(NodeLocalId, node_lid, node_group)
+            {
+              if (nodes_infos.isOwn(node_lid)) {
+                DoFLocalId dof_id = node_dof.dofId(node_lid, dof_index);
+                in_out_forced_info[dof_id] = true;
+                in_out_forced_value[dof_id] = penalty;
+                in_out_rhs_variable[dof_id] = penalty * (value - in_u[node_lid][dof_index]);
+              }
+            };
           }
           else if (bs->getEnforceDirichletMethod() == "RowElimination") {
-            Gpu::BoundaryConditionsHelpers::applyDirichletToNodeGroupViaRowOrRowColumnElimination(ELIMINATE_ROW, dof_index, value, queue, m_linear_system, m_dofs_on_nodes, node_group);
+            Real value0 = 0.0;
+            Gpu::BoundaryConditionsHelpers::applyDirichletToNodeGroupViaRowOrRowColumnElimination(ELIMINATE_ROW, dof_index, value0, queue, m_linear_system, m_dofs_on_nodes, node_group);
           }
           else if (bs->getEnforceDirichletMethod() == "RowColumnElimination") {
-            Gpu::BoundaryConditionsHelpers::applyDirichletToNodeGroupViaRowOrRowColumnElimination(ELIMINATE_ROW_COLUMN, dof_index, value, queue, m_linear_system, m_dofs_on_nodes, node_group);
+            Real value0 = 0.0;
+            Gpu::BoundaryConditionsHelpers::applyDirichletToNodeGroupViaRowOrRowColumnElimination(ELIMINATE_ROW_COLUMN, dof_index, value0, queue, m_linear_system, m_dofs_on_nodes, node_group);
           }
           else {
             ARCANE_FATAL("Unknown method to enforce Dirichlet BC: '{0}'", bs->getEnforceDirichletMethod());
@@ -214,7 +236,6 @@ void FemModuleElastoplasticity::_assembleDirichletsNewtonGpu()
         }
       }
     }
-      // FemUtils::Gpu::BoundaryConditions::applyDirichletToLhsAndRhs(bs, m_dofs_on_nodes, m_linear_system, mesh_ptr, queue);
 
     for (BC::IDirichletPointCondition* bs : bc->dirichletPointConditions()) {
       ARCANE_CHECK_PTR(bs);
@@ -245,6 +266,5 @@ void FemModuleElastoplasticity::_assembleDirichletsNewtonGpu()
         }
       }
     }
-      // FemUtils::Gpu::BoundaryConditions::applyPointDirichletToLhsAndRhs(bs, m_dofs_on_nodes, m_linear_system, mesh_ptr, queue);
-  }
+   }
 }

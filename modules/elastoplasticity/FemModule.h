@@ -83,7 +83,7 @@ class FemModuleElastoplasticity
   void _assembleDirichletsGpu();
   void _assembleDirichletsNewtonGpu();
 
-  inline void _applyResidualRHSTria3Gpu(VariableDoFReal& rhs_values, const FemDoFsOnNodes& dofs_on_nodes, const VariableNodeReal3& node_coord, IMesh* mesh, RunQueue* queue);
+  inline void _applyInternalBodyForceTria3Gpu(VariableDoFReal& rhs_values, const FemDoFsOnNodes& dofs_on_nodes, const VariableNodeReal3& node_coord, IMesh* mesh, RunQueue* queue);
 
  private:
 
@@ -142,16 +142,16 @@ class FemModuleElastoplasticity
   void _updateVariables();
   void _initBsr();
 
-  inline void _applyBodyForce(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
+  inline void _applyExternalBodyForce(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
   inline void _applyTraction(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
   inline void _applyDirichlet(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
   inline void _applyDirichletNewton(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
 
-  inline void _applyResidualRHS(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
-  inline void _applyResidualRHSTria3Cpu(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
-  inline void _applyResidualRHSQuad4(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
-  inline void _applyResidualRHSTetra4(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
-  inline void _applyResidualRHSHexa8(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
+  inline void _applyInternalBodyForce(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
+  inline void _applyInternalBodyForceTria3Cpu(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
+  inline void _applyInternalBodyForceQuad4(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
+  inline void _applyInternalBodyForceTetra4(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
+  inline void _applyInternalBodyForceHexa8(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
 
   RealMatrix<6, 6> _computeElementMatrixTria3(Cell cell);
   RealMatrix<12, 12> _computeElementMatrixTetra4(Cell cell);

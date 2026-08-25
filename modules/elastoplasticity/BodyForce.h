@@ -29,7 +29,7 @@
 /*---------------------------------------------------------------------------*/
 
 inline void FemModuleElastoplasticity::
-_applyBodyForce(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof)
+_applyExternalBodyForce(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof)
 {
 
   // get bodyforce vector

@@ -422,20 +422,14 @@ _assembleLinearOperator()
 
   auto node_dof(m_dofs_on_nodes.nodeDoFConnectivityView());
 
-  _applyBodyForce(rhs_values, node_dof);
+  _applyExternalBodyForce(rhs_values, node_dof);
   _applyTraction(rhs_values, node_dof);
 
   if (m_nonlinear_law) {
-    if (m_newton_iter == 0) { // we solve a linear system to get an initial guess that satisfies dirichlet
-                              // ONly works for elasticity problem TODO change strategy for other problems
-      _applyDirichlet(rhs_values, node_dof);
-    } else {
-
-      m_evaluate_residual_with_increment = false;
-      _applyResidualRHS(rhs_values, node_dof);
-      _applyDirichletNewton(rhs_values, node_dof);
-    }
-  } else {
+    m_evaluate_residual_with_increment = false;
+    _applyInternalBodyForce(rhs_values, node_dof);
+    _applyDirichletNewton(rhs_values, node_dof);
+   } else {
     _applyDirichlet(rhs_values, node_dof);
   }
 
@@ -825,7 +819,7 @@ _checkNewtonConvergence()
   auto node_dof(m_dofs_on_nodes.nodeDoFConnectivityView());
 
   m_evaluate_residual_with_increment = true;
-  _applyResidualRHS(residual_values, node_dof); // -F_int(du)
+  _applyInternalBodyForce(residual_values, node_dof); // -F_int(du)
 
   Real l2_norm_rhs = 0.0;
   {

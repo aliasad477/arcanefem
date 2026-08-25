@@ -21,7 +21,7 @@
 /*---------------------------------------------------------------------------*/
 
 inline void FemModuleElastoplasticity::
-_applyResidualRHS(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof)
+_applyInternalBodyForce(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof)
 {
   auto use_gpu = options()->linearSystem.serviceName() == "HypreLinearSystem" ||
     options()->linearSystem.serviceName() == "PetscLinearSystem";
@@ -31,29 +31,29 @@ _applyResidualRHS(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityV
     auto mesh_ptr = mesh();
     if (mesh()->dimension() == 2) {
       if (m_hex_quad_mesh) {
-        _applyResidualRHSQuad4(rhs_values, node_dof);
+        _applyInternalBodyForceQuad4(rhs_values, node_dof);
       } else {
-        _applyResidualRHSTria3Gpu(rhs_values, m_dofs_on_nodes, m_node_coord, mesh_ptr, queue);
+        _applyInternalBodyForceTria3Gpu(rhs_values, m_dofs_on_nodes, m_node_coord, mesh_ptr, queue);
       }
     } else {
       if (m_hex_quad_mesh) {
-        _applyResidualRHSHexa8(rhs_values, node_dof);
+        _applyInternalBodyForceHexa8(rhs_values, node_dof);
       } else {
-        _applyResidualRHSTetra4(rhs_values, node_dof);
+        _applyInternalBodyForceTetra4(rhs_values, node_dof);
       }
     }
   } else {
     if (mesh()->dimension() == 2) {
       if (m_hex_quad_mesh) {
-        _applyResidualRHSQuad4(rhs_values, node_dof);
+        _applyInternalBodyForceQuad4(rhs_values, node_dof);
       } else {
-        _applyResidualRHSTria3Cpu(rhs_values, node_dof);
+        _applyInternalBodyForceTria3Cpu(rhs_values, node_dof);
       }
     } else {
       if (m_hex_quad_mesh) {
-        _applyResidualRHSHexa8(rhs_values, node_dof);
+        _applyInternalBodyForceHexa8(rhs_values, node_dof);
       } else {
-        _applyResidualRHSTetra4(rhs_values, node_dof);
+        _applyInternalBodyForceTetra4(rhs_values, node_dof);
       }
     }
   }
@@ -136,7 +136,7 @@ computeResidualTria3Base(Real3 dxu,
 }
 
 inline void FemModuleElastoplasticity::
-_applyResidualRHSTria3Gpu(VariableDoFReal& rhs_values,
+_applyInternalBodyForceTria3Gpu(VariableDoFReal& rhs_values,
                           const FemDoFsOnNodes& dofs_on_nodes,
                           const VariableNodeReal3& node_coord,
                           IMesh* mesh, RunQueue* queue)
@@ -255,7 +255,7 @@ _applyResidualRHSTria3Gpu(VariableDoFReal& rhs_values,
 }
 
 inline void FemModuleElastoplasticity::
-_applyResidualRHSTria3Cpu(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof)
+_applyInternalBodyForceTria3Cpu(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof)
 {
   ENUMERATE_ (Cell, icell, allCells()) {
     Cell cell = *icell;
@@ -320,7 +320,7 @@ _applyResidualRHSTria3Cpu(VariableDoFReal& rhs_values, const IndexedNodeDoFConne
 
 
 void FemModuleElastoplasticity::
-_applyResidualRHSQuad4(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof)
+_applyInternalBodyForceQuad4(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof)
 {
   ENUMERATE_ (Cell, icell, allCells()) {
     Cell cell = *icell;
@@ -439,7 +439,7 @@ _applyResidualRHSQuad4(VariableDoFReal& rhs_values, const IndexedNodeDoFConnecti
 }
 
 inline void FemModuleElastoplasticity::
-_applyResidualRHSTetra4(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof)
+_applyInternalBodyForceTetra4(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof)
 {
   ENUMERATE_ (Cell, icell, allCells())
   {
@@ -604,7 +604,7 @@ _applyResidualRHSTetra4(VariableDoFReal& rhs_values, const IndexedNodeDoFConnect
 }
 
 void FemModuleElastoplasticity::
-_applyResidualRHSHexa8(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof)
+_applyInternalBodyForceHexa8(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof)
 {
   ENUMERATE_ (Cell, icell, allCells()) {
     Cell cell = *icell;
