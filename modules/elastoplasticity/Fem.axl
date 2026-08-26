@@ -30,7 +30,7 @@
   </variables>
   <options>
     <simple name = "f" type = "string[]" default="NULL NULL NULL" optional="true">
-      <description>Body force vector (space separated list).</description>
+      <description>External body force vector (space separated list).</description>
     </simple>
 
     <simple name="E" type="real" default="0.0">
@@ -39,6 +39,10 @@
 
     <simple name="nu" type="real" default="0.0">
       <description>Poissons ratio of the material.</description>
+    </simple>
+
+    <simple name="sig0" type="real" default="0.0">
+      <description>Yeild strength of material.</description>
     </simple>
 
     <simple name="solution-comparison-file" type="string" optional="true">

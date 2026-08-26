@@ -38,6 +38,7 @@ startInit()
 
   E = options()->E(); // Youngs modulus
   nu = options()->nu(); // Poission ratio ν
+  sig0 = options()->sig0(); // Yield Strength
 
   m_dof_per_node = defaultMesh()->dimension();
   m_matrix_format = options()->matrixFormat();
@@ -238,11 +239,34 @@ _solveNewton()
 {
   info() << "[ArcaneFem-Info] Started module  _solveNewton()";
 
-  while (m_newton_iter < m_newton_max_iters) {
-    _getMaterialParameters();
+  _getMaterialParameters();
+
+  if (m_assemble_linear_system) {
+    _assembleBilinearOperator();
+    _assembleLinearOperator();
+  }
+
+  VariableDoFReal& residual_values(m_linear_system.rhsVariable());
+  auto node_dof(m_dofs_on_nodes.nodeDoFConnectivityView());
+  // _applyDirichlet0(residual_values, node_dof);
+
+  m_residual_norm0 = _norm_l2(residual_values, node_dof);
+
+  info() << "[ArcaneFem-Info] Initial residual norm = " << m_residual_norm0;
+
+  while (m_newton_iter < m_newton_max_iters && !m_newton_solver_converged) {
+
+    ++m_newton_iter;
+
+    if(m_solve_nonlinear_system){
+      _solve();
+      _updateNewtonIncrements();
+    }
+
+    _incrementVariables();
 
     if(m_assemble_nonlinear_system) {
-      if (m_linear_system.isInitialized() && m_newton_iter != 0) {
+      if (m_linear_system.isInitialized()) {
         m_linear_system.clearValues();
 
         if (m_matrix_format == "BSR" || m_matrix_format == "AF-BSR")
@@ -250,32 +274,15 @@ _solveNewton()
 
         _assembleBilinearOperator(); // assembles Jacobian
         _assembleLinearOperator(); // assembles Residuals(m_U) + BCs
-      } else {
-        _assembleBilinearOperator(); // iter 0: initialisation contd.
-        _assembleLinearOperator();   // iter 0: initialisation contd.
       }
-    }
-
-    if(m_solve_nonlinear_system){
-      _solve();
-      _updateNewtonIncrements();
     }
 
     _checkNewtonConvergence();
 
-    // m_U += m_dU
-    _incrementVariables();
+  }
 
-    ++m_newton_iter;
-
-    if (m_newton_solver_converged) {
-      info() << "[ArcaneFem-Info] Newton solver converged after " << m_newton_iter - 1 << " iterations.";
-      m_newton_iter = 0;
-      m_newton_solver_converged = false;
-      break;
-    } else {
-      _updateGuessFromIncrement(); // TODO remove if m_linear_solve keeps the previous solution
-    }
+  if (m_newton_solver_converged) {
+    info() << "[ArcaneFem-Info] Newton solver converged after " << m_newton_iter << " iterations.";
   }
 
   if (m_newton_iter == m_newton_max_iters && !m_newton_solver_converged) {
@@ -299,6 +306,11 @@ _getMaterialParameters()
 
   mu = (E / (2 * (1 + nu))); // lame parameter μ
   lambda = E * nu / ((1 + nu) * (1 - 2 * nu)); // lame parameter λ
+
+  if (m_nonlinear_law) { // set von Mises params
+    Et = E / 100.;
+    H = E * Et / (E - Et);
+  }
 
   /*
    {{lambda + 2. * mu, lambda,           0.},
@@ -773,6 +785,7 @@ _incrementVariables()
   elapsedTime = platform::getRealTime() - elapsedTime;
   ArcaneFemFunctions::GeneralFunctions::printArcaneFemTime(traceMng(), "increment-fem-variables", elapsedTime);
 }
+
 /*---------------------------------------------------------------------------*/
 /**
  * @brief Check for the convergence of nonlinear solver.
@@ -783,7 +796,6 @@ _incrementVariables()
  *
  */
 /*---------------------------------------------------------------------------*/
-
 void FemModuleElastoplasticity::
 _checkNewtonConvergence()
 {
@@ -793,53 +805,74 @@ _checkNewtonConvergence()
   m_dU.synchronize();
   m_U.synchronize();
 
-  Real l2_norm_du = 0.0;
-  Real l2_norm_u = 0.0;
-  {
-    ENUMERATE_ (Node, inode, ownNodes()) {
-      const Real norm_du = math::pow(m_dU[inode][0], 2.0) + math::pow(m_dU[inode][1], 2.0) + math::pow(m_dU[inode][2], 2.0);
-      const Real norm_u = math::pow(m_U[inode][0], 2.0) + math::pow(m_U[inode][1], 2.0) + math::pow(m_U[inode][2], 2.0);
-      l2_norm_du += norm_du;
-      l2_norm_u += norm_u;
-    }
-  }
-  IParallelMng* pm = defaultMesh()->parallelMng();
-  l2_norm_du = pm->reduce(Parallel::ReduceSum, l2_norm_du);
-  l2_norm_u = pm->reduce(Parallel::ReduceSum, l2_norm_u);
+  Real l2_norm_du = _norm_l2(m_dU);
+  Real l2_norm_u = _norm_l2(m_U);
 
-  l2_norm_du = math::sqrt(l2_norm_du);
-  l2_norm_u = math::sqrt(l2_norm_u);
-
-  increment_norm = l2_norm_u != 0.0 ? l2_norm_du / l2_norm_u : 1.0;
+  Real increment_norm = l2_norm_u != 0.0 ? l2_norm_du / l2_norm_u : 1.0;
   Real convergence_error_increment = l2_norm_du / (m_newton_rtol * l2_norm_u  + m_newton_atol);
 
   VariableDoFReal& residual_values(m_linear_system.rhsVariable());
   auto node_dof(m_dofs_on_nodes.nodeDoFConnectivityView());
-  Real l2_norm_rhs = 0.0;
+  _applyDirichlet0(residual_values, node_dof);
+
+  Real l2_norm_rhs = _norm_l2(residual_values, node_dof);
+
+  Real residual_norm = l2_norm_rhs!=0 ? l2_norm_rhs / m_residual_norm0 : 1.0;
+  Real convergence_error_residual = l2_norm_rhs / (m_residual_norm0 + 1e-30);
+
+  // The OR criterion follows petsc SNES
+  if (convergence_error_residual <= m_newton_rtol) {
+    m_newton_solver_converged = true;
+    m_newton_converged_reason = "RESIDUAL_CONVERGED";
+    info() << "[ArcaneFem-Info] At Newton iteration "<< m_newton_iter <<": ||X_k+1 - X_k||/||X_k+1|| = " << increment_norm << " ||(F_ext - F_int(X_k))||/||(F_ext - F_int(X_0))|| = " << residual_norm << " => " << "CONVERGED with " << m_newton_converged_reason;
+  } else if (convergence_error_increment <= 1.0) {
+    m_newton_solver_converged = true;
+    m_newton_converged_reason = "INCREMENT_CONVERGED";
+    info() << "[ArcaneFem-Info] At Newton iteration "<< m_newton_iter <<": ||X_k+1 - X_k||/||X_k+1|| = " << increment_norm << " ||(F_ext - F_int(X_k))||/||(F_ext - F_int(X_0))|| = " << residual_norm << " => " << "CONVERGED with " << m_newton_converged_reason;
+  } else {
+    m_newton_solver_converged = false;
+    info() << "[ArcaneFem-Info] At Newton iteration "<< m_newton_iter <<": ||X_k+1 - X_k||/||X_k+1|| = " << increment_norm << " ||(F_ext - F_int(X_k))||/||(F_ext - F_int(X_0))|| = " << residual_norm << " => " << "NOT CONVERGED";
+  }
+
+    elapsedTime = platform::getRealTime() - elapsedTime;
+  ArcaneFemFunctions::GeneralFunctions::printArcaneFemTime(traceMng(), "check-newton-convergence", elapsedTime);
+}
+
+inline Real FemModuleElastoplasticity::
+_norm_l2(VariableNodeReal3& u) {
+  Real l2_norm_u = 0.0;
+  {
+    ENUMERATE_ (Node, inode, ownNodes()) {
+      const Real norm_u = math::pow(u[inode][0], 2.0) + math::pow(u[inode][1], 2.0) + math::pow(u[inode][2], 2.0);
+      l2_norm_u += norm_u;
+    }
+  }
+  IParallelMng* pm = defaultMesh()->parallelMng();
+  l2_norm_u = pm->reduce(Parallel::ReduceSum, l2_norm_u);
+
+  return math::sqrt(l2_norm_u);
+}
+
+inline Real FemModuleElastoplasticity::
+_norm_l2(VariableDoFReal& u, const IndexedNodeDoFConnectivityView& node_dof) {
+  Real l2_norm_u = 0.0;
   {
     ENUMERATE_ (Node, inode, ownNodes()) {
       Real norm_residual = 0.0;
       if (mesh()->dimension() == 2) {
-        norm_residual =  math::pow(residual_values[node_dof.dofId(inode, 0)], 2.0)
-                  + math::pow(residual_values[node_dof.dofId(inode, 1)], 2.0);
+        norm_residual =  math::pow(u[node_dof.dofId(inode, 0)], 2.0)
+                  + math::pow(u[node_dof.dofId(inode, 1)], 2.0);
       } else {
-        norm_residual =  math::pow(residual_values[node_dof.dofId(inode, 0)], 2.0)
-                  + math::pow(residual_values[node_dof.dofId(inode, 1)], 2.0)
-                  + math::pow(residual_values[node_dof.dofId(inode, 2)], 2.0);
+        norm_residual =  math::pow(u[node_dof.dofId(inode, 0)], 2.0)
+                  + math::pow(u[node_dof.dofId(inode, 1)], 2.0)
+                  + math::pow(u[node_dof.dofId(inode, 2)], 2.0);
       }
-      l2_norm_rhs += norm_residual;
+      l2_norm_u += norm_residual;
     }
   }
-  l2_norm_rhs = pm->reduce(Parallel::ReduceSum, l2_norm_rhs);
-  residual_norm = math::sqrt(l2_norm_rhs);
-
-  // The OR criterion follows petsc SNES
-  m_newton_solver_converged = (convergence_error_increment <= 1.0 || (m_newton_iter + 1 > 0 && residual_norm <= m_newton_atol));
-
-  info() << "[ArcaneFem-Info] At newton iteration "<< m_newton_iter <<": ||X_k+1 - X_k||/||X_k|| = " << increment_norm << " and ||(F_ext - F_int(X_k))|| = " << residual_norm << " => " << (m_newton_solver_converged ? "CONVERGED" : "NOT CONVERGED");
-
-  elapsedTime = platform::getRealTime() - elapsedTime;
-  ArcaneFemFunctions::GeneralFunctions::printArcaneFemTime(traceMng(), "check-newton-convergence", elapsedTime);
+  IParallelMng* pm = defaultMesh()->parallelMng();
+  l2_norm_u = pm->reduce(Parallel::ReduceSum, l2_norm_u);
+  return math::sqrt(l2_norm_u);
 }
 
 /*---------------------------------------------------------------------------*/

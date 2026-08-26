@@ -82,6 +82,7 @@ class FemModuleElastoplasticity
   void _assembleBilinearOperator();
   void _assembleDirichletsGpu();
   void _assembleDirichletsNewtonGpu();
+  void _assembleDirichlets0Gpu();
 
   inline void _applyInternalBodyForceTria3Gpu(VariableDoFReal& rhs_values, const FemDoFsOnNodes& dofs_on_nodes, const VariableNodeReal3& node_coord, IMesh* mesh, RunQueue* queue);
 
@@ -91,14 +92,17 @@ class FemModuleElastoplasticity
   FemDoFsOnNodes m_dofs_on_nodes;
   BSRFormat m_bsr_format;
 
-  Real E;
-  Real nu;
+  Real E; // Youngs modulus
+  Real nu; // Poisson ratio
+  Real sig0; // Yield strength
   Real mu;
   Real lambda;
+  Real Et; // Tangent modulus
+  Real H; // Hardening modulus
+  Real Qlim; // Limiting pressure
   Real m_newton_atol;
   Real m_newton_rtol;
-  Real residual_norm = 0.0;
-  Real increment_norm = 0.0;
+  Real m_residual_norm0 = 0.0;
 
   Real3 f;
   Real3 t;
@@ -115,6 +119,7 @@ class FemModuleElastoplasticity
   String m_petsc_flags;
   String m_matrix_format = "DOK";
   String m_gp_material_tensor_strategy = "local";
+  String m_newton_converged_reason = "";
 
   bool m_use_gpu_functions = true;
   bool m_assemble_linear_system = true;
@@ -145,12 +150,16 @@ class FemModuleElastoplasticity
   inline void _applyTraction(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
   inline void _applyDirichlet(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
   inline void _applyDirichletNewton(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
+  inline void _applyDirichlet0(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
 
   inline void _applyInternalBodyForce(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
   inline void _applyInternalBodyForceTria3Cpu(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
   inline void _applyInternalBodyForceQuad4(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
   inline void _applyInternalBodyForceTetra4(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
   inline void _applyInternalBodyForceHexa8(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
+
+  inline Real _norm_l2(VariableNodeReal3& u);
+  inline Real _norm_l2(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
 
   RealMatrix<6, 6> _computeElementMatrixTria3(Cell cell);
   RealMatrix<12, 12> _computeElementMatrixTetra4(Cell cell);
