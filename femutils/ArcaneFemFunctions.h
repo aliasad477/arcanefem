@@ -3016,6 +3016,7 @@ class ArcaneFemFunctions
       FaceGroup group = bs->getSurface();
 
       Real3 t;
+
       // get traction force vector
       bool applyTraction = false;
       const UniqueArray<String> t_string = bs->getValue();
@@ -3034,8 +3035,12 @@ class ArcaneFemFunctions
       ENUMERATE_ (Face, iface, group) {
         Face face = *iface;
         Real length = ArcaneFemFunctions::MeshOperation::computeLengthEdge2(face, node_coord);
+        Real2 normal = ArcaneFemFunctions::MeshOperation::computeNormalEdge2(face, node_coord);
+
         for (Node node : iface->nodes()) {
           if (node.isOwn()) {
+            // rhs_values[node_dof.dofId(node, 0)] += (t[0] * normal.x + t[1] * normal.y) * length / 2.;
+            // rhs_values[node_dof.dofId(node, 1)] += (t[0] * normal.x + t[1] * normal.y) * length / 2.;
             rhs_values[node_dof.dofId(node, 0)] += t[0] * length / 2.;
             rhs_values[node_dof.dofId(node, 1)] += t[1] * length / 2.;
           }
@@ -3146,10 +3151,13 @@ class ArcaneFemFunctions
       ENUMERATE_ (Face, iface, group) {
         Face face = *iface;
         Real length = ArcaneFemFunctions::MeshOperation::computeLengthEdge2(face, node_coord);
+        Real2 normal = ArcaneFemFunctions::MeshOperation::computeNormalEdge2(face, node_coord);
         for (Node node : iface->nodes()) {
           if (node.isOwn()) {
-            rhs_values[node_dof.dofId(node, 0)] += trac[0] * length / 2.;
-            rhs_values[node_dof.dofId(node, 1)] += trac[1] * length / 2.;
+            // rhs_values[node_dof.dofId(node, 0)] += (trac[0] * normal.x + trac[1] * normal.y) * length / 2.;
+            // rhs_values[node_dof.dofId(node, 1)] += (trac[0] * normal.x + trac[1] * normal.y) * length / 2.;
+            rhs_values[node_dof.dofId(node, 0)] += (trac[0]) * length / 2.;
+            rhs_values[node_dof.dofId(node, 1)] += (trac[1]) * length / 2.;
           }
         }
       }

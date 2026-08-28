@@ -117,7 +117,7 @@ _applyDirichletNewton(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectiv
               Node node = *inode;
               if (node.isOwn()) {
                 m_linear_system.matrixSetValue(node_dof.dofId(node, dof_index), node_dof.dofId(node, dof_index), penalty);
-                Real u_g = penalty * (value - m_U[node][dof_index]);
+                Real u_g = penalty * (value - m_DU[node][dof_index]);
                 rhs_values[node_dof.dofId(node, dof_index)] = u_g;
               }
             }
@@ -210,7 +210,7 @@ void FemModuleElastoplasticity::_assembleDirichletsNewtonGpu()
             auto in_out_forced_info = viewInOut(command, m_linear_system.getForcedInfo());
             auto in_out_forced_value = viewInOut(command, m_linear_system.getForcedValue());
             auto in_out_rhs_variable = viewInOut(command, m_linear_system.rhsVariable());
-            auto in_u = viewIn(command, m_U);
+            auto in_u = viewIn(command, m_DU);
 
             command << RUNCOMMAND_ENUMERATE(NodeLocalId, node_lid, node_group)
             {

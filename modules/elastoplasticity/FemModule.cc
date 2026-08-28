@@ -21,6 +21,7 @@
 #include "Traction.h"
 #include "Dirichlet.h"
 #include "InternalBodyForce.h"
+#include "InternalBodyForceVonMises.h"
 
 /*---------------------------------------------------------------------------*/
 /**
@@ -35,6 +36,9 @@ startInit()
 {
   info() << "[ArcaneFem-Info] Started module  startInit()";
   Real elapsedTime = platform::getRealTime();
+
+  tmax = options()->tmax(); // max time 𝑡ₘₐₓ
+  dt = options()->dt(); // time step δ𝑡
 
   E = options()->E(); // Youngs modulus
   nu = options()->nu(); // Poission ratio ν
@@ -59,19 +63,57 @@ startInit()
                           (options()->linearSystem.serviceName() == "HypreLinearSystem" ||
                            options()->linearSystem.serviceName() == "PetscLinearSystem" ||
                            options()->linearSystem.serviceName() == "AlephLinearSystem");
-  //
+
   m_gp_material_tensor_strategy = options()->gpMaterialTensorStrategy();
   m_check_with_bilinear_operator = options()->checkBilinearOperatorForResidual();
 
   if (m_gp_material_tensor_strategy == "global") {
     if (mesh()->dimension() == 2) {
-      m_C_2d_cell.reshape({ 3, 3 });
       m_C_tang_2d_cell.reshape({ 3, 3 });
     } else {
-      m_C_3d_cell.reshape({ 6, 6 });
       m_C_tang_3d_cell.reshape({ 6, 6 });
     }
   }
+
+  if (m_nonlinear_law) {
+
+    if (mesh()->dimension() == 2) {
+
+      if (m_hex_quad_mesh) {
+        m_nGP = 4;
+      } else {
+        m_nGP = 1;
+      }
+
+      m_epsilon_2d_gp.reshape({m_nGP, 3});
+      m_sigma_2d_gp.reshape({m_nGP, 3});
+      m_sigma_old_2d_gp.reshape({m_nGP, 3});
+      m_sigma_trial_2d_gp.reshape({m_nGP, 3});
+      m_dev_2d_gp.reshape({m_nGP, 3});
+      m_flowN_2d_gp.reshape({m_nGP, 3});
+
+      m_sigma_zz_2d_gp.reshape({m_nGP});
+      m_sigma_zz_old_2d_gp.reshape({m_nGP});
+      m_p_old_2d_gp.reshape({m_nGP});
+      m_dp_2d_gp.reshape({m_nGP});
+
+    } else {
+
+      if (m_hex_quad_mesh) {
+        m_nGP = 8;
+      } else {
+        m_nGP = 1;
+      }
+
+      ARCANE_FATAL("ERROR: Von mises yield criterion is not implemented for 3D");
+    }
+  }
+
+  t = dt;
+  tmax = tmax - dt;
+  m_global_deltat.assign(dt);
+
+  _readCaseTables();
 
   elapsedTime = platform::getRealTime() - elapsedTime;
   ArcaneFemFunctions::GeneralFunctions::printArcaneFemTime(traceMng(),"initialize", elapsedTime);
@@ -96,13 +138,21 @@ compute()
   Real elapsedTime = platform::getRealTime();
 
   // Stop code after computations
-  if (m_global_iteration() > 0)
+  // if (m_global_iteration() > 0)
+  //   subDomain()->timeLoopMng()->stopComputeLoop(true);
+  // Stop the computation loop if the maximum time is reached
+  if (t >= tmax)
     subDomain()->timeLoopMng()->stopComputeLoop(true);
 
-  m_linear_system.reset();
-  m_linear_system.setLinearSystemFactory(options()->linearSystem());
-  m_linear_system.initialize(subDomain(), acceleratorMng()->defaultRunner(), m_dofs_on_nodes.dofFamily(), "Solver");
-  m_linear_system.clearValues();
+  info() << "[ArcaneFem-Info] Time iteration at t : " << t << " (s) ";
+  bool keep_struct = true;
+  if (m_linear_system.isInitialized() && keep_struct) {
+    m_linear_system.clearValues();
+  } else {
+    m_linear_system.reset();
+    m_linear_system.setLinearSystemFactory(options()->linearSystem());
+    m_linear_system.initialize(subDomain(), acceleratorMng()->defaultRunner(), m_dofs_on_nodes.dofFamily(), "Solver");
+  }
 
   if (m_petsc_flags != NULL){
     CommandLineArguments args = ArcaneFemFunctions::GeneralFunctions::getPetscFlagsFromCommandline(m_petsc_flags);
@@ -127,10 +177,20 @@ compute()
   info() << "[ArcaneFem-Info] mesh nodes " << total_nb_node;
 
   _doStationarySolve();
+  _updateTime();
 
   elapsedTime = platform::getRealTime() - elapsedTime;
   ArcaneFemFunctions::GeneralFunctions::printArcaneFemTime(traceMng(),"compute", elapsedTime);
 }
+/*---------------------------------------------------------------------------*/
+/*---------------------------------------------------------------------------*/
+
+void FemModuleElastoplasticity::
+_updateTime()
+{
+  t += dt;
+}
+
 
 /*---------------------------------------------------------------------------*/
 /**
@@ -138,7 +198,8 @@ compute()
  */
 /*---------------------------------------------------------------------------*/
 
-void FemModuleElastoplasticity::_initBsr()
+void FemModuleElastoplasticity::
+_initBsr()
 {
   info() << "[ArcaneFem-Info] Started module  _initBsr()";
   Real elapsedTime = platform::getRealTime();
@@ -241,30 +302,174 @@ _solveNewton()
 
   _getMaterialParameters();
 
+  // --- initialize_increment ---- //
+  m_DU.fill({0., 0., 0.});
+  m_dU.fill({0., 0., 0.});
+  m_newton_iter = 0;
+
+  // --- restore_converged_state ---- //
+  ENUMERATE_ (Cell, icell, allCells())
+  {
+    Cell cell = *icell;
+
+    for (Int8 iGP = 0; iGP < m_nGP; ++iGP ) {
+      m_sigma_2d_gp(cell, iGP, 0) = m_sigma_old_2d_gp(cell, iGP, 0);
+      m_sigma_2d_gp(cell, iGP, 1) = m_sigma_old_2d_gp(cell, iGP, 1);
+      m_sigma_2d_gp(cell, iGP, 2) = m_sigma_old_2d_gp(cell, iGP, 2);
+    }
+
+    for (Int8 ix = 0; ix < 3; ++ix)
+      for (Int8 iy = 0; iy < 3; ++iy)
+        m_C_tang_2d_cell(cell, ix, iy) = m_C_2d(ix, iy); // set tangent C equal to elastic C
+  }
+
+  // --- assemble_linear_system ---- //
   if (m_assemble_linear_system) {
     _assembleBilinearOperator();
     _assembleLinearOperator();
   }
 
+  // --- calculate_residual ---- //
   VariableDoFReal& residual_values(m_linear_system.rhsVariable());
   auto node_dof(m_dofs_on_nodes.nodeDoFConnectivityView());
   // _applyDirichlet0(residual_values, node_dof);
-
   m_residual_norm0 = _norm_l2(residual_values, node_dof);
-
   info() << "[ArcaneFem-Info] Initial residual norm = " << m_residual_norm0;
 
+
+  // --- start_newton_loop ---- //
   while (m_newton_iter < m_newton_max_iters && !m_newton_solver_converged) {
 
-    ++m_newton_iter;
+    m_newton_iter++;
 
+    // --- solve_linear_system ---- //
     if(m_solve_nonlinear_system){
       _solve();
       _updateNewtonIncrements();
     }
 
+    // --- update_increment ---- //
     _incrementVariables();
 
+    ENUMERATE_ (Cell, icell, allCells())
+    {
+      Cell cell = *icell;
+
+      for (Int8 iGP = 0; iGP < m_nGP; ++iGP ) {
+
+        // --- compute_trial_state ---- //
+        // computeTrialStateVM();
+        // epsilon(DU)
+        Real3x3 grad_DU = ArcaneFemFunctions::FeOperation2D::FeOperation2D::computeGradientTria3(cell, m_node_coord, m_DU);
+        Real eps_xx = grad_DU(0, 0);
+        Real eps_yy = grad_DU(1, 1);
+        Real eps_xy = M_SQRT1_2 * (grad_DU(0, 1) + grad_DU(1, 0));
+
+        info() << "[ArcaneFem-Info] eps_xx = " << eps_xx << " eps_yy = " << eps_yy << " eps_xy = " << eps_xy;
+
+        m_epsilon_2d_gp(cell, iGP, 0) = eps_xx;
+        m_epsilon_2d_gp(cell, iGP, 1) = eps_yy;
+        m_epsilon_2d_gp(cell, iGP, 2) = eps_xy;
+
+        info() << "[ArcaneFem-Info] eps_xx = " << eps_xx << " eps_yy = " << eps_yy << " eps_xy = " << eps_xy;
+
+        Real sigma_trial_xx = m_sigma_old_2d_gp(cell, iGP, 0) + m_C_2d(0, 0) * eps_xx + m_C_2d(0, 1) * eps_yy + m_C_2d(0, 2) * eps_xy;
+        Real sigma_trial_yy = m_sigma_old_2d_gp(cell, iGP, 1) + m_C_2d(1, 0) * eps_xx + m_C_2d(1, 1) * eps_yy + m_C_2d(1, 2) * eps_xy;
+        Real sigma_trial_xy = m_sigma_old_2d_gp(cell, iGP, 2) + m_C_2d(2, 0) * eps_xx + m_C_2d(2, 1) * eps_yy + m_C_2d(2, 2) * eps_xy;
+
+        Real sigma_trial_zz = m_sigma_zz_old_2d_gp(cell, iGP) + lambda * (eps_xx + eps_yy);
+
+        m_sigma_trial_2d_gp(cell, iGP, 0) = sigma_trial_xx;
+        m_sigma_trial_2d_gp(cell, iGP, 1) = sigma_trial_yy;
+        m_sigma_trial_2d_gp(cell, iGP, 2) = sigma_trial_xy;
+
+        info() << "[ArcaneFem-Info] sigma_trial_xx = " << sigma_trial_xx << " sigma_trial_yy = " << sigma_trial_yy << " sigma_trial_xy = " << sigma_trial_xy;
+
+        Real sigma_trial_mean = (m_sigma_trial_2d_gp(cell, iGP, 0) + m_sigma_trial_2d_gp(cell, iGP, 1) + m_sigma_trial_2d_gp(cell, iGP, 2))/3.0;
+
+        Real dev_xx = m_sigma_trial_2d_gp(cell, iGP, 0) - sigma_trial_mean;
+        Real dev_yy = m_sigma_trial_2d_gp(cell, iGP, 1) - sigma_trial_mean;
+        Real dev_xy = m_sigma_trial_2d_gp(cell, iGP, 2);
+
+        Real dev_zz = sigma_trial_zz - sigma_trial_mean;
+
+        m_dev_2d_gp(cell, iGP, 0) = dev_xx;
+        m_dev_2d_gp(cell, iGP, 1) = dev_yy;
+        m_dev_2d_gp(cell, iGP, 2) = dev_xy;
+
+        info() << "[ArcaneFem-Info] dev_xx = " << dev_xx << " dev_yy = " << dev_yy << " dev_xy = " << dev_xy;
+
+        Real sigma_eq_trial = math::sqrt(1.5 * (dev_xx * dev_xx + dev_yy * dev_yy + dev_zz * dev_zz + dev_xy * dev_xy) );
+
+        info() << "[ArcaneFem-Info] sigma_eq_trial = " << sigma_eq_trial;
+
+        // --- evaluate_yield_function ---- //
+        // _computeYieldFunctionVM();
+        Real yield_function = sigma_eq_trial - sig0 - H * m_p_old_2d_gp(cell, iGP);
+        Real yield_positive = (yield_function + math::abs(yield_function)) / 2.;
+        m_dp_2d_gp(cell, iGP) = yield_positive/ (3. * mu + H);
+        Real plastic_switch = yield_positive / (math::abs(yield_function) + 1e-14 * sig0);
+
+        // --- radial_return_update ---- //
+        // _computeRadialReturnVM();
+        Real flowN_xx = plastic_switch * dev_xx / (sigma_eq_trial + 1e-14 * sig0);
+        Real flowN_yy = plastic_switch * dev_yy / (sigma_eq_trial + 1e-14 * sig0);
+        Real flowN_xy = plastic_switch * dev_xy / (sigma_eq_trial + 1e-14 * sig0);
+        Real flowN_zz = plastic_switch * dev_zz / (sigma_eq_trial + 1e-14 * sig0);
+
+        Real beta = 3. * mu * m_dp_2d_gp(cell, iGP) / (sigma_eq_trial + 1e-14 * sig0);
+
+        m_flowN_2d_gp(cell, iGP, 0) = flowN_xx;
+        m_flowN_2d_gp(cell, iGP, 1) = flowN_yy;
+        m_flowN_2d_gp(cell, iGP, 2) = flowN_xy;
+
+        info() << "[ArcaneFem-Info] flowN_xx = " << flowN_xx << " flowN_yy = " << flowN_yy << " flowN_xy = " << flowN_xy;
+        info() << "[ArcaneFem-Info] flowN_zz = " << flowN_zz;
+        info() << "[ArcaneFem-Info] beta = " << beta;
+
+        // --- update_consistent_tangent ---- //
+        // _updateStressTensorVM();
+        Real sigma_xx = m_sigma_trial_2d_gp(cell, iGP, 0) - dev_xx * beta;
+        Real sigma_yy = m_sigma_trial_2d_gp(cell, iGP, 1) - dev_yy * beta;
+        Real sigma_xy = m_sigma_trial_2d_gp(cell, iGP, 2) - dev_xy * beta;
+
+        Real sigma_zz = sigma_trial_zz - dev_zz * beta;
+
+        m_sigma_2d_gp(cell, iGP, 0) = sigma_xx;
+        m_sigma_2d_gp(cell, iGP, 1) = sigma_yy;
+        m_sigma_2d_gp(cell, iGP, 2) = sigma_xy;
+
+        m_sigma_zz_2d_gp(cell, iGP) = sigma_zz;
+
+        info() << "[ArcaneFem-Info] sigma_xx = " << sigma_xx << " sigma_yy = " << sigma_yy << " sigma_xy = " << sigma_xy;
+        info() << "[ArcaneFem-Info] sigma_zz = " << sigma_zz;
+
+        // _updateTangentMaterialTensorVM(); // NOTE if not we store everything and assemble locally with at element matrix assembly i.e., local gp technique.
+        Real tangentA = 3.* mu * (3. * mu / (3. * mu + H) - beta);
+        info() << "[ArcaneFem-Info] tangentA = " << tangentA;
+
+        // Consistent algorithmic tangent for the radial-return update:
+        m_C_tang_2d_cell(cell, 0, 0) = m_C_2d(0, 0) - tangentA * flowN_xx * flowN_xx - 4. * mu * beta / 3.;
+        m_C_tang_2d_cell(cell, 0, 1) = m_C_2d(0, 1) - tangentA * flowN_xx * flowN_yy + 2. * mu * beta / 3.;
+        m_C_tang_2d_cell(cell, 0, 2) = m_C_2d(0, 2) - tangentA * flowN_xx * flowN_xy;
+
+        info() << "[ArcaneFem-Info] C_tang row 1 done ";
+
+        m_C_tang_2d_cell(cell, 1, 0) = m_C_2d(1, 0) - tangentA * flowN_xx * flowN_yy - 2. * mu * beta / 3.;
+        m_C_tang_2d_cell(cell, 1, 1) = m_C_2d(1, 1) - tangentA * flowN_yy * flowN_yy - 4. * mu * beta / 3.;
+        m_C_tang_2d_cell(cell, 1, 2) = m_C_2d(1, 2) - tangentA * flowN_yy * flowN_xy;
+
+        info() << "[ArcaneFem-Info] C_tang row 2 done ";
+
+        m_C_tang_2d_cell(cell, 2, 0) = m_C_2d(2, 0) - tangentA * flowN_xx * flowN_xy;
+        m_C_tang_2d_cell(cell, 2, 1) = m_C_2d(2, 1) - tangentA * flowN_yy * flowN_xy;
+        m_C_tang_2d_cell(cell, 2, 2) = m_C_2d(2, 2) - tangentA * flowN_xy * flowN_xy - 2. * mu * beta / 3.;
+
+        info() << "[ArcaneFem-Info] C_tang row 3 done ";
+      }
+    }
+
+    // --- assemble_linear_system ---- //
     if(m_assemble_nonlinear_system) {
       if (m_linear_system.isInitialized()) {
         m_linear_system.clearValues();
@@ -273,22 +478,50 @@ _solveNewton()
           m_bsr_format.resetMatrixValues();
 
         _assembleBilinearOperator(); // assembles Jacobian
-        _assembleLinearOperator(); // assembles Residuals(m_U) + BCs
+        _assembleLinearOperator(); // assembles Residuals(m_DU) + BCs
       }
     }
 
+    // --- calculate_residual ---- //
     _checkNewtonConvergence();
 
   }
 
   if (m_newton_solver_converged) {
     info() << "[ArcaneFem-Info] Newton solver converged after " << m_newton_iter << " iterations.";
+    m_newton_solver_converged = false;
+    m_newton_iter = 0;
   }
 
   if (m_newton_iter == m_newton_max_iters && !m_newton_solver_converged) {
     info() << "[ArcaneFem-Info] Newton iterations did not converge after maximum (" << m_newton_max_iters << ") iterations";
     ARCANE_FATAL("Newton iterations diverged after max iters");
   }
+
+  // --- commit_displacements ---- //
+  m_U.synchronize();
+  m_DU.synchronize();
+  ENUMERATE_ (Node, inode, ownNodes()) {
+    m_U[inode] += m_DU[inode];
+  }
+  m_U.synchronize();
+
+  // --- commit_internal_variables ---- //
+  ENUMERATE_ (Cell, icell, allCells())
+  {
+    Cell cell = *icell;
+
+    for (Int8 iGP = 0; iGP < m_nGP; ++iGP ) {
+      m_sigma_old_2d_gp(cell, iGP, 0) = m_sigma_2d_gp(cell, iGP, 0);
+      m_sigma_old_2d_gp(cell, iGP, 1) = m_sigma_2d_gp(cell, iGP, 1);
+      m_sigma_old_2d_gp(cell, iGP, 2) = m_sigma_2d_gp(cell, iGP, 2);
+
+      m_sigma_zz_old_2d_gp(cell, iGP) = m_sigma_zz_2d_gp(cell, iGP);
+      m_p_old_2d_gp(cell, iGP) += m_dp_2d_gp(cell, iGP);
+    }
+  }
+
+
 
 }
 
@@ -307,96 +540,98 @@ _getMaterialParameters()
   mu = (E / (2 * (1 + nu))); // lame parameter μ
   lambda = E * nu / ((1 + nu) * (1 - 2 * nu)); // lame parameter λ
 
-  if (m_nonlinear_law) { // set von Mises params
-    Et = E / 100.;
-    H = E * Et / (E - Et);
-  }
-
+  // Elastic material tensors
   /*
-   {{lambda + 2. * mu, lambda,           0.},
-    {lambda,           lambda + 2. * mu, 0.},
-    {0.,               0.,               mu}}
-  */ // 2D elastic material tensor
+ {{lambda + 2. * mu, lambda,           0.},
+  {lambda,           lambda + 2. * mu, 0.},
+  {0.,               0.,               2 * mu}}
+*/ // 2D elastic material tensor
 
   /*
    {{lambda + 2.*mu, lambda,         lambda,         0.,  0.,  0.},
     {lambda,         lambda + 2.*mu, lambda,         0.,  0.,  0.},
     {lambda,         lambda,         lambda + 2.*mu, 0.,  0.,  0.},
-    {0.,             0.,             0.,             mu,  0.,  0.},
-    {0.,             0.,             0.,             0.,  mu,  0.},
-    {0.,             0.,             0.,             0.,  0.,  mu}}
+    {0.,             0.,             0.,             2mu,  0.,  0.},
+    {0.,             0.,             0.,             0.,  2mu,  0.},
+    {0.,             0.,             0.,             0.,  0.,  2mu}}
   */ // 3D elastic material tensor
+
+  if (mesh()->dimension() == 2) {
+    m_C_2d.fill(0.);
+    m_C_2d(0, 0) = lambda + 2. * mu;
+    m_C_2d(1, 1) = lambda + 2. * mu;
+    m_C_2d(2, 2) = 2. * mu;
+    m_C_2d(0, 1) = lambda;
+    m_C_2d(1, 0) = lambda;
+  } else {
+    m_C_3d.fill(0.);
+    m_C_3d(0, 0) = lambda + 2. * mu;
+    m_C_3d(1, 1) = lambda + 2. * mu;
+    m_C_3d(2, 2) = lambda + 2. * mu;
+    m_C_3d(3, 3) = 2 * mu;
+    m_C_3d(4, 4) = 2 * mu;
+    m_C_3d(5, 5) = 2 * mu;
+    m_C_3d(0, 1) = lambda;
+    m_C_3d(1, 0) = lambda;
+    m_C_3d(0, 2) = lambda;
+    m_C_3d(2, 0) = lambda;
+    m_C_3d(1, 2) = lambda;
+    m_C_3d(2, 1) = lambda;
+  }
+
+  if (m_nonlinear_law) { // set von Mises params
+    Et = E / 100.;
+    H = E * Et / (E - Et);
+
+    if (mesh()->dimension() == 2) {
+      ENUMERATE_ (Cell, icell, allCells())
+      {
+        for (Int8 iGP = 0; iGP < m_nGP; ++iGP ) {
+          m_sigma_2d_gp(icell, iGP, 0) = 0.;
+          m_sigma_2d_gp(icell, iGP, 1) = 0.;
+          m_sigma_2d_gp(icell, iGP, 2) = 0.;
+          m_sigma_zz_2d_gp(icell, iGP) = 0.;
+
+          m_sigma_old_2d_gp(icell, iGP, 0) = 0.;
+          m_sigma_old_2d_gp(icell, iGP, 1) = 0.;
+          m_sigma_old_2d_gp(icell, iGP, 2) = 0.;
+          m_sigma_zz_old_2d_gp(icell, iGP) = 0.;
+
+          m_sigma_trial_2d_gp(icell, iGP, 0) = 0.;
+          m_sigma_trial_2d_gp(icell, iGP, 1) = 0.;
+          m_sigma_trial_2d_gp(icell, iGP, 2) = 0.;
+
+          m_p_old_2d_gp(icell, iGP) = 0.;
+          m_dp_2d_gp(icell, iGP) = 0.;
+        }
+      }
+    } else {
+      ARCANE_FATAL("Not implemented yet");
+    }
+  }
+
+
 
   if (m_gp_material_tensor_strategy == "local") {
      if (mesh()->dimension() == 2) {
-       m_C_tang_2d.fill(0.);
-       m_C_tang_2d(0, 0) = lambda + 2. * mu;
-       m_C_tang_2d(1, 1) = lambda + 2. * mu;
-       m_C_tang_2d(2, 2) = mu;
-       m_C_tang_2d(0, 1) = lambda;
-       m_C_tang_2d(1, 0) = lambda;
-
-       m_C_2d = m_C_tang_2d; // elasticity
+       m_C_tang_2d = m_C_2d;
      } else {
-       m_C_tang_3d.fill(0.);
-       m_C_tang_3d(0, 0) = lambda + 2. * mu;
-       m_C_tang_3d(1, 1) = lambda + 2. * mu;
-       m_C_tang_3d(2, 2) = lambda + 2. * mu;
-       m_C_tang_3d(3, 3) = mu;
-       m_C_tang_3d(4, 4) = mu;
-       m_C_tang_3d(5, 5) = mu;
-       m_C_tang_3d(0, 1) = lambda;
-       m_C_tang_3d(1, 0) = lambda;
-       m_C_tang_3d(0, 2) = lambda;
-       m_C_tang_3d(2, 0) = lambda;
-       m_C_tang_3d(1, 2) = lambda;
-       m_C_tang_3d(2, 1) = lambda;
-
-       m_C_3d = m_C_tang_3d; // elasticity
+       m_C_tang_3d = m_C_3d;
      }
   } else {
     if (mesh()->dimension() == 2) {
       ENUMERATE_ (Cell, icell, allCells()) {
-        for (Int32 ix = 0; ix < 3; ++ix) {
-          for (Int32 iy = 0; iy < 3; ++iy) {
-            m_C_tang_2d_cell(icell, ix, iy) = 0.0;
+        for (Int8 ix = 0; ix < 3; ++ix) {
+          for (Int8 iy = 0; iy < 3; ++iy) {
+            m_C_tang_2d_cell(icell, ix, iy) = m_C_2d(ix, iy);
           }
         }
-        m_C_tang_2d_cell(icell, 0, 0) = lambda + 2. * mu;
-        m_C_tang_2d_cell(icell, 1, 1) = lambda + 2. * mu;
-        m_C_tang_2d_cell(icell, 2, 2) = mu;
-        m_C_tang_2d_cell(icell, 0, 1) = lambda;
-        m_C_tang_2d_cell(icell, 1, 0) = lambda;
-
-        for (Int32 ix = 0; ix < 3; ++ix) {
-          for (Int32 iy = 0; iy < 3; ++iy) {
-            m_C_2d_cell(icell, ix, iy) = m_C_tang_2d_cell(icell, ix, iy);
-          }
-        } // elasticity
       }
     } else {
       ENUMERATE_ (Cell, icell, allCells()) {
-        for (Int32 ix = 0; ix < 6; ++ix) {
-          for (Int32 iy = 0; iy < 6; ++iy) {
-            m_C_tang_3d_cell(icell, ix, iy) = 0.0;
-          }
-        }
-        m_C_tang_3d_cell(icell,0, 0) = lambda + 2. * mu;
-        m_C_tang_3d_cell(icell,1, 1) = lambda + 2. * mu;
-        m_C_tang_3d_cell(icell,2, 2) = lambda + 2. * mu;
-        m_C_tang_3d_cell(icell,3, 3) = mu;
-        m_C_tang_3d_cell(icell,4, 4) = mu;
-        m_C_tang_3d_cell(icell,5, 5) = mu;
-        m_C_tang_3d_cell(icell,0, 1) = lambda;
-        m_C_tang_3d_cell(icell,1, 0) = lambda;
-        m_C_tang_3d_cell(icell,0, 2) = lambda;
-        m_C_tang_3d_cell(icell,2, 0) = lambda;
-        m_C_tang_3d_cell(icell,1, 2) = lambda;
-        m_C_tang_3d_cell(icell,2, 1) = lambda;
-
-        for (Int32 ix = 0; ix < 6; ++ix) {
-          for (Int32 iy = 0; iy < 6; ++iy) {
-            m_C_3d_cell(icell, ix, iy) = m_C_tang_3d_cell(icell, ix, iy);
+        for (Int8 ix = 0; ix < 6; ++ix) {
+          for (Int8 iy = 0; iy < 6; ++iy) {
+            m_C_tang_3d_cell(icell,ix, iy) = m_C_3d(ix, iy);
           }
         }
       }
@@ -613,7 +848,7 @@ _validateResults()
     ENUMERATE_ (Node, inode, allNodes()) {
       Node node = *inode;
       std::cout << "( N_id, u1, u2, u3 ) = ( "
-                << node.uniqueId() << ", " << m_U[node].x << ", " << m_U[node].y << ", " << m_U[node].z
+                << node.uniqueId() << ", " << m_DU[node].x << ", " << m_DU[node].y << ", " << m_DU[node].z
                 << ")\n";
     }
     std::cout.precision(p);
@@ -623,10 +858,36 @@ _validateResults()
   const double epsilon = options()->resultEpsilon();
   const double min_value_to_test = 1.0e-10;
 
-  Arcane::FemUtils::checkNodeResultFile(traceMng(), filename, m_U, epsilon, min_value_to_test);
+  Arcane::FemUtils::checkNodeResultFile(traceMng(), filename, m_DU, epsilon, min_value_to_test);
 
   elapsedTime = platform::getRealTime() - elapsedTime;
   ArcaneFemFunctions::GeneralFunctions::printArcaneFemTime(traceMng(),"result-validation", elapsedTime);
+}
+
+/*---------------------------------------------------------------------------*/
+/*
+  * @brief Reads case tables for traction boundary conditions.
+  *
+  * This method reads the case tables specified in the options and stores
+  * them in a list for later use.
+  */
+/*---------------------------------------------------------------------------*/
+
+void FemModuleElastoplasticity::
+_readCaseTables()
+{
+  IParallelMng* pm = subDomain()->parallelMng();
+  BC::IArcaneFemBC* bc = options()->boundaryConditions();
+
+  // loop over all traction boundries
+  for (BC::ITractionBoundaryCondition* bs : bc->tractionBoundaryConditions()) {
+    CaseTable* case_table = nullptr;
+    auto traction_table_file_name = bs->getTractionInputFile();
+    bool getTractionFromTable = !traction_table_file_name.empty();
+    if (getTractionFromTable)
+      case_table = readFileAsCaseTable(pm, traction_table_file_name, 3);
+    m_traction_case_table_list.add(CaseTableInfo{ traction_table_file_name, case_table });
+  }
 }
 
 /*---------------------------------------------------------------------------*/
@@ -655,18 +916,18 @@ _updateVariables()
         Real u1_val = dof_u[node_dof.dofId(node, 0)];
         Real u2_val = dof_u[node_dof.dofId(node, 1)];
         Real u3_val = dof_u[node_dof.dofId(node, 2)];
-        m_U[node] = Real3(u1_val, u2_val, u3_val);
+        m_DU[node] = Real3(u1_val, u2_val, u3_val);
       }
     else
       ENUMERATE_ (Node, inode, ownNodes()) {
         Node node = *inode;
         Real u1_val = dof_u[node_dof.dofId(node, 0)];
         Real u2_val = dof_u[node_dof.dofId(node, 1)];
-        m_U[node] = Real3(u1_val, u2_val, 0.);
+        m_DU[node] = Real3(u1_val, u2_val, 0.);
       }
   }
 
-  m_U.synchronize();
+  m_DU.synchronize();
 
   elapsedTime = platform::getRealTime() - elapsedTime;
   ArcaneFemFunctions::GeneralFunctions::printArcaneFemTime(traceMng(),"update-variables", elapsedTime);
@@ -774,13 +1035,13 @@ _incrementVariables()
   Real elapsedTime = platform::getRealTime();
 
   m_dU.synchronize();
-  m_U.synchronize();
+  m_DU.synchronize();
   {
       ENUMERATE_ (Node, inode, ownNodes()) {
-      m_U[inode] += m_dU[inode];
+      m_DU[inode] += m_dU[inode];
     }
   }
-  m_U.synchronize();
+  m_DU.synchronize();
 
   elapsedTime = platform::getRealTime() - elapsedTime;
   ArcaneFemFunctions::GeneralFunctions::printArcaneFemTime(traceMng(), "increment-fem-variables", elapsedTime);
@@ -803,10 +1064,10 @@ _checkNewtonConvergence()
   Real elapsedTime = platform::getRealTime();
 
   m_dU.synchronize();
-  m_U.synchronize();
+  m_DU.synchronize();
 
   Real l2_norm_du = _norm_l2(m_dU);
-  Real l2_norm_u = _norm_l2(m_U);
+  Real l2_norm_u = _norm_l2(m_DU);
 
   Real increment_norm = l2_norm_u != 0.0 ? l2_norm_du / l2_norm_u : 1.0;
   Real convergence_error_increment = l2_norm_du / (m_newton_rtol * l2_norm_u  + m_newton_atol);

@@ -73,6 +73,11 @@ class FemModuleElastoplasticity
     cm->setTreatWarningAsError(true);
     cm->setAllowUnkownRootElelement(false);
   }
+  ~FemModuleElastoplasticity()
+  {
+    for( const CaseTableInfo&  t : m_traction_case_table_list )
+      delete t.case_table;
+  }
 
   void startInit() override; //! Method called at the beginning of the simulation
   void compute() override; //! Method called at each iteration
@@ -92,6 +97,11 @@ class FemModuleElastoplasticity
   FemDoFsOnNodes m_dofs_on_nodes;
   BSRFormat m_bsr_format;
 
+  // List of CaseTable for traction boundary conditions
+  UniqueArray<CaseTableInfo> m_traction_case_table_list;
+  Real t;
+  Real dt;
+  Real tmax;
   Real E; // Youngs modulus
   Real nu; // Poisson ratio
   Real sig0; // Yield strength
@@ -105,7 +115,6 @@ class FemModuleElastoplasticity
   Real m_residual_norm0 = 0.0;
 
   Real3 f;
-  Real3 t;
 
   RealMatrix<3, 3> m_C_2d;
   RealMatrix<3, 3> m_C_tang_2d;
@@ -113,6 +122,7 @@ class FemModuleElastoplasticity
   RealMatrix<6, 6> m_C_tang_3d;
 
   Int8 m_dof_per_node;
+  Int8 m_nGP=1;
   Int32 m_newton_iter;
   Int32 m_newton_max_iters;
 
@@ -133,6 +143,7 @@ class FemModuleElastoplasticity
   bool m_newton_solver_converged = false;
   bool m_check_with_bilinear_operator = false;
 
+  void _updateTime();
   void _getMaterialParameters();
   void _solveLinear();
   void _solveNewton();
@@ -141,13 +152,18 @@ class FemModuleElastoplasticity
   void _solve();
   void _assembleLinearOperator();
   void _validateResults();
+  void _readCaseTables();
   void _updateNewtonIncrements();
   void _updateGuessFromIncrement();
   void _updateVariables();
   void _initBsr();
 
   inline void _applyExternalBodyForce(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
+
   inline void _applyTraction(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
+  static inline void _applyTractionTableToRhsTria3(BC::ITractionBoundaryCondition* bs, const Real t, Int32 boundary_condition_index, const UniqueArray<Arcane::FemUtils::CaseTableInfo>& traction_case_table_list, const IndexedNodeDoFConnectivityView& node_dof, const VariableNodeReal3& node_coord, VariableDoFReal& rhs_values);
+
+
   inline void _applyDirichlet(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
   inline void _applyDirichletNewton(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
   inline void _applyDirichlet0(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
@@ -157,6 +173,9 @@ class FemModuleElastoplasticity
   inline void _applyInternalBodyForceQuad4(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
   inline void _applyInternalBodyForceTetra4(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
   inline void _applyInternalBodyForceHexa8(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
+
+  inline void _applyInternalBodyForceVonMises(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
+  inline void _applyInternalBodyForceVonMisesTria3Cpu(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
 
   inline Real _norm_l2(VariableNodeReal3& u);
   inline Real _norm_l2(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);

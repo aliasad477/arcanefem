@@ -9,23 +9,50 @@
     <variable field-name="U" name="U" data-type="real3" item-kind="node" dim="0">
       <description>U vector from Arcane variable</description>
     </variable>
+    <variable field-name="DU" name="DU" data-type="real3" item-kind="node" dim="0">
+      <description>DU vector from Arcane variable</description>
+    </variable>
     <variable field-name="dU" name="dU" data-type="real3" item-kind="node" dim="0">
       <description>dU vector from Arcane variable for Newton increment</description>
     </variable>
     <variable field-name="node_coord" name="NodeCoord" data-type="real3" item-kind="node" dim="0">
       <description>Node coordinates from Arcane variable</description>
     </variable>
-    <variable field-name="C_2d_cell" name="C_2d_cell" data-type="real" item-kind="cell" shape-dim="2">
-      <description>Material tensor for 2D constitutive law</description>
-    </variable>
-    <variable field-name="C_3d_cell" name="C_3d_cell" data-type="real" item-kind="cell" shape-dim="2">
-       <description>Material tensor for 3D constitutive law</description>
-    </variable>
     <variable field-name="C_tang_2d_cell" name="C_tang_2d_cell" data-type="real" item-kind="cell" shape-dim="2">
       <description>Tangent of the material tensor for 2D constitutive law</description>
     </variable>
     <variable field-name="C_tang_3d_cell" name="C_tang_3d_cell" data-type="real" item-kind="cell" shape-dim="2">
        <description>Tangent of the material tensor for 3D constitutive law</description>
+    </variable>
+    <variable field-name="epsilon_2d_gp" name="epsilon_2d_gp" data-type="real" item-kind="cell" shape-dim="2">
+      <description>Strain tensor for 2D on gauss points</description>
+    </variable>
+    <variable field-name="sigma_2d_gp" name="sigma_2d_gp" data-type="real" item-kind="cell" shape-dim="2">
+      <description>Stress tensor for 2D on gauss points</description>
+    </variable>
+    <variable field-name="sigma_old_2d_gp" name="sigma_old_2d_gp" data-type="real" item-kind="cell" shape-dim="2">
+      <description>Previous step stress tensor for 2D on gauss points</description>
+    </variable>
+    <variable field-name="sigma_trial_2d_gp" name="sigma_trial_2d_gp" data-type="real" item-kind="cell" shape-dim="2">
+      <description>Trial stress tensor for 2D on gauss points</description>
+    </variable>
+    <variable field-name="dev_2d_gp" name="dev_2d_gp" data-type="real" item-kind="cell" shape-dim="2">
+      <description>Deviatoric stress tensor for 2D on gauss points</description>
+    </variable>
+    <variable field-name="flowN_2d_gp" name="flowN_2d_gp" data-type="real" item-kind="cell" shape-dim="2">
+      <description>Radial return tensor for 2D on gauss points</description>
+    </variable>
+    <variable field-name="sigma_zz_2d_gp" name="sigma_zz_2d_gp" data-type="real" item-kind="cell" shape-dim="1">
+      <description>zz component of stress tensor for 2D on gauss points</description>
+    </variable>
+    <variable field-name="sigma_zz_old_2d_gp" name="sigma_zz_old_2d_gp" data-type="real" item-kind="cell" shape-dim="1">
+      <description>Previous step zz component of stress tensor for 2D on gauss points</description>
+    </variable>
+    <variable field-name="p_old_2d_gp" name="p_old_2d_gp" data-type="real" item-kind="cell" shape-dim="1">
+      <description>Previous step plastic strain for 2D on gauss points</description>
+    </variable>
+    <variable field-name="dp_2d_gp" name="dp_2d_gp" data-type="real" item-kind="cell" shape-dim="1">
+      <description>Change in plastic strain for 2D on gauss points</description>
     </variable>
   </variables>
   <options>
@@ -43,6 +70,14 @@
 
     <simple name="sig0" type="real" default="0.0">
       <description>Yeild strength of material.</description>
+    </simple>
+
+    <simple name="tmax" type="real" default="0.0">
+      <description>Maximum time.</description>
+    </simple>
+
+    <simple name="dt" type="real" default="0.0">
+      <description>Time step.</description>
     </simple>
 
     <simple name="solution-comparison-file" type="string" optional="true">
