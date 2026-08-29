@@ -96,8 +96,10 @@ _applyTractionTableToRhsTria3(BC::ITractionBoundaryCondition* bs, const Real t, 
     Real2 normal = ArcaneFemFunctions::MeshOperation::computeNormalEdge2(face, node_coord);
     for (Node node : iface->nodes()) {
       if (node.isOwn()) {
-        rhs_values[node_dof.dofId(node, 0)] += (trac[0] * normal.x + trac[1] * normal.y) * length / 2.;
-        rhs_values[node_dof.dofId(node, 1)] += (trac[0] * normal.x + trac[1] * normal.y) * length / 2.;
+        // The table stores the pressure magnitude in its x/y columns. Internal
+        // pressure acts opposite to the outward normal of the hollow domain.
+        rhs_values[node_dof.dofId(node, 0)] -= trac[0] * normal.x * length / 2.;
+        rhs_values[node_dof.dofId(node, 1)] -= trac[1] * normal.y * length / 2.;
       }
     }
   }
