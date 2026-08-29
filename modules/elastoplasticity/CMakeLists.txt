@@ -84,9 +84,8 @@ if (FEMUTILS_HAS_SOLVER_BACKEND_PETSC)
   arcanefem_add_seq_test(NAME 3D_bar_parse_and_exit
           COMMAND ./Elastoplasticity
           ARGS
-          -A,//fem/nonlinear-law=true
-          -A,//fem/assemble-nonlinear-system=false
-          -A,//fem/solve-nonlinear-system=false
+          -A,//fem/assemble-linear-system=false
+          -A,//fem/solve-linear-system=false
           inputs/bar.3D.Dirichlet.bodyForce.arc)
 
   arcanefem_add_seq_test(NAME 3D_Dirichlet_cartesian
