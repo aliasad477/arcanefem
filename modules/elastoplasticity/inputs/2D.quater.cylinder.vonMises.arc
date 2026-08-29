@@ -31,14 +31,19 @@
     <nu>0.3</nu>
     <sig0>250.</sig0>
     <f>NULL NULL</f>
+    <linear-system name="AlephLinearSystem">
+      <epsilon>1.0e-12</epsilon>
+    </linear-system>
     <boundary-conditions>
       <dirichlet>
         <surface>left</surface>
-        <value>NULL 0.0</value>
+        <value>0.0 NULL</value>
+        <enforce-Dirichlet-method>RowColumnElimination</enforce-Dirichlet-method>
       </dirichlet>
       <dirichlet>
         <surface>bottom</surface>
-        <value>0.0 NULL</value>
+        <value>NULL 0.0</value>
+        <enforce-Dirichlet-method>RowColumnElimination</enforce-Dirichlet-method>
       </dirichlet>
       <traction>
         <surface>inner</surface>
