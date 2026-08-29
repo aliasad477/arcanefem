@@ -43,6 +43,9 @@ const RealVector<4>& dxu, const RealVector<4>& dyu, Real integration_weight, Rea
   RealVector<8> epsyy = { 0., dyu(0), 0., dyu(1), 0., dyu(2), 0., dyu(3) };
   RealVector<8> epsxy = { dyu(0), dxu(0), dyu(1), dxu(1), dyu(2), dxu(2), dyu(3), dxu(3) };
 
+  // Kelvin notation: scale shear strains by 1/sqrt(2)
+  epsxy = M_SQRT1_2 * epsxy;
+
   // ∫∫ C_tang11 ∂𝑢𝑥/∂𝑥 ∂𝑣𝑥/∂𝑥 + C_tang12 ∂𝑢𝑦/∂𝑦 ∂𝑣𝑥/∂𝑥 + C_tang13 (∂𝑢𝑦/∂𝑥 + ∂𝑢𝑥/∂𝑦) ∂𝑣𝑥/∂𝑥
   RealMatrix<8, 8> sigmaXepsxx = (C_tang(0, 0) * epsxx + C_tang(0, 1) * epsyy + C_tang(0, 2) * epsxy) ^ epsxx;
 
@@ -155,6 +158,11 @@ Real integration_weight, RealMatrix<6, 6> C_tang)
                            dyu(2), dxu(2), 0.,    dyu(3), dxu(3), 0.,
                            dyu(4), dxu(4), 0.,    dyu(5), dxu(5), 0.,
                            dyu(6), dxu(6), 0.,    dyu(7), dxu(7), 0. };
+
+  // Kelvin notation: scale shear strains by 1/sqrt(2)
+  epsyz = M_SQRT1_2 * epsyz;
+  epszx = M_SQRT1_2 * epszx;
+  epsxy = M_SQRT1_2 * epsxy;
 
   // ∫∫∫ C_tang11 ∂𝑢𝑥/∂𝑥 ∂𝑣𝑥/∂𝑥 + C_tang12 ∂𝑢𝑦/∂𝑦 ∂𝑣𝑥/∂𝑥 + C_tang13 ∂𝑢𝑧/∂𝑧 ∂𝑣𝑥/∂𝑥 + C_tang14 (∂𝑢𝑧/∂𝑦 + ∂𝑢𝑦/∂𝑧) ∂𝑣𝑥/∂𝑥 + C_tang15 (∂𝑢𝑥/∂𝑧 + ∂𝑢𝑧/∂𝑥) ∂𝑣𝑥/∂𝑥 + C_tang16 (∂𝑢𝑦/∂𝑥 + ∂𝑢𝑥/∂𝑦) ∂𝑣𝑥/∂𝑥
   RealMatrix<24, 24> sigmaXepsxx = (C_tang(0, 0) * epsxx + C_tang(0, 1) * epsyy + C_tang(0, 2) * epszz + C_tang(0, 3) * epsyz + C_tang(0, 4) * epszx + C_tang(0, 5) * epsxy) ^ epsxx;
