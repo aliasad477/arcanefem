@@ -222,9 +222,6 @@ _handleParameters(IParallelMng* pm)
   }
 
   PetscBool set;
-  PETSC_OPTION(Real, "-ksp_rtol", m_ksp_rtol)
-  PETSC_OPTION(Real, "-ksp_atol", m_ksp_atol)
-  PETSC_OPTION(Int, "-ksp_max_it", m_ksp_max_it)
   PETSC_OPTION_STRING("-ksp_type", m_ksp_type)
   PETSC_OPTION_STRING("-pc_type", m_pc_type)
   PETSC_OPTION_STRING("-mat_type", m_mat_type)
@@ -344,8 +341,11 @@ _preallocateMatrix()
   PetscCallAbort(mpi_comm, MatAssemblyBegin(m_petsc_matrix, MAT_FINAL_ASSEMBLY));
   PetscCallAbort(mpi_comm, MatAssemblyEnd(m_petsc_matrix, MAT_FINAL_ASSEMBLY));
 
+  // Todo: seperate function for KSP creation and setting operators, tolerances, etc.
   PetscCallAbort(mpi_comm, KSPCreate(mpi_comm, &m_petsc_solver_context));
   PetscCallAbort(mpi_comm, KSPSetOperators(m_petsc_solver_context, m_petsc_matrix, m_petsc_matrix));
+  PetscCallAbort(mpi_comm, KSPSetTolerances(m_petsc_solver_context, m_ksp_rtol, m_ksp_atol, PETSC_DEFAULT, m_ksp_max_it)); // Todo: add dtol in ArcaneFEM and replace PETSC_DEFAULT
+  PetscCallAbort(mpi_comm, KSPSetErrorIfNotConverged(m_petsc_solver_context, PETSC_TRUE)); // To catch errors if the solver does not converge
   PetscCallAbort(mpi_comm, KSPSetFromOptions(m_petsc_solver_context));
 }
 
