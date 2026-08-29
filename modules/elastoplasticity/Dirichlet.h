@@ -286,16 +286,16 @@ inline void FemModuleElastoplasticity::
 _applyDirichlet0(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof)
 {
   // check if Hypre|Petsc solver is used and delegate to GPU for dirichlet assembly
-  auto use_gpu = options()->linearSystem.serviceName() == "HypreLinearSystem" ||
-    options()->linearSystem.serviceName() == "PetscLinearSystem";
-  if (use_gpu && m_use_gpu_functions) {
-    _assembleDirichlets0Gpu();
-    return;
-    return;
-  }
+  // auto use_gpu = options()->linearSystem.serviceName() == "HypreLinearSystem" ||
+  //   options()->linearSystem.serviceName() == "PetscLinearSystem";
+  // if (use_gpu && m_use_gpu_functions) {
+  //   _assembleDirichlets0Gpu();
+  //   return;
+  //   return;
+  // }
 
-  info() << "[ArcaneFem-Info] Started module _assembleDirichletsNewtonCpu()";
-
+  //info() << "[ArcaneFem-Info] Started module _assembleDirichletsNewtonCpu()";
+  // Explicitly remove reaction components so the norm contains free DoFs only.
   BC::IArcaneFemBC* bc = options()->boundaryConditions();
   if (bc) {
     for (BC::IDirichletBoundaryCondition* bs : bc->dirichletBoundaryConditions()) {
@@ -304,22 +304,9 @@ _applyDirichlet0(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityVi
       const StringConstArrayView u_dirichlet_string = bs->getValue();
       for (Int32 dof_index = 0; dof_index < u_dirichlet_string.size(); ++dof_index) {
         if (u_dirichlet_string[dof_index] != "NULL") {
-
-          if (bs->getEnforceDirichletMethod() == "Penalty") {
-            Real penalty = bs->getPenalty();
-            Real value0 = 0.0;
-            ArcaneFemFunctions::BoundaryConditionsHelpers::applyDirichletToNodeGroupViaPenalty(dof_index, value0, penalty, node_dof, m_linear_system, rhs_values, node_group);
-          }
-          else if (bs->getEnforceDirichletMethod() == "RowElimination") {
-            Real value0 = 0.0;
-            ArcaneFemFunctions::BoundaryConditionsHelpers::applyDirichletToNodeGroupViaRowElimination(dof_index, value0, node_dof, m_linear_system, rhs_values, node_group);
-          }
-          else if (bs->getEnforceDirichletMethod() == "RowColumnElimination") {
-            Real value0 = 0.0;
-            ArcaneFemFunctions::BoundaryConditionsHelpers::applyDirichletToNodeGroupViaRowColumnElimination(dof_index, value0, node_dof, m_linear_system, rhs_values, node_group);
-          }
-          else {
-            ARCANE_FATAL("Unknown Dirichlet method");
+          ENUMERATE_ (Node, inode, node_group) {
+            if (inode->isOwn())
+              rhs_values[node_dof.dofId(*inode, dof_index)] = 0.0;
           }
         }
       }
@@ -330,22 +317,9 @@ _applyDirichlet0(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityVi
       const StringConstArrayView u_dirichlet_string = bs->getValue();
       for (Int32 dof_index = 0; dof_index < u_dirichlet_string.size(); ++dof_index) {
         if (u_dirichlet_string[dof_index] != "NULL") {
-          Real value = 0.0;
-          if (m_newton_iter == 0) {
-            value = std::stod(u_dirichlet_string[dof_index].localstr());
-          }
-          if (bs->getEnforceDirichletMethod() == "Penalty") {
-            Real penalty = bs->getPenalty();
-            ArcaneFemFunctions::BoundaryConditionsHelpers::applyDirichletToNodeGroupViaPenalty(dof_index, value, penalty, node_dof, m_linear_system, rhs_values, node_group);
-          }
-          else if (bs->getEnforceDirichletMethod() == "RowElimination") {
-            ArcaneFemFunctions::BoundaryConditionsHelpers::applyDirichletToNodeGroupViaRowElimination(dof_index, value, node_dof, m_linear_system, rhs_values, node_group);
-          }
-          else if (bs->getEnforceDirichletMethod() == "RowColumnElimination") {
-            ArcaneFemFunctions::BoundaryConditionsHelpers::applyDirichletToNodeGroupViaRowColumnElimination(dof_index, value, node_dof, m_linear_system, rhs_values, node_group);
-          }
-          else {
-            ARCANE_FATAL("Unknown Dirichlet method");
+          ENUMERATE_ (Node, inode, node_group) {
+            if (inode->isOwn())
+              rhs_values[node_dof.dofId(*inode, dof_index)] = 0.0;
           }
         }
       }
