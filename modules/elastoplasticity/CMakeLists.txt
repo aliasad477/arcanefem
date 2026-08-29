@@ -76,6 +76,11 @@ if (FEMUTILS_HAS_SOLVER_BACKEND_PETSC)
           -A,//fem/solve-nonlinear-system=false
           inputs/bar.2D.Dirichlet.bodyForce.arc)
 
+  arcanefem_add_seq_test(NAME 2D_quarter_cylinder_von_mises
+          COMMAND ./Elastoplasticity
+          ARGS
+          inputs/2D.quater.cylinder.vonMises.arc)
+
   arcanefem_add_seq_test(NAME 3D_bar_parse_and_exit
           COMMAND ./Elastoplasticity
           ARGS
