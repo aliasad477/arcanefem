@@ -140,6 +140,7 @@ class FemModuleElastoplasticity
   bool m_hex_quad_mesh = false;
 
   bool m_nonlinear_law = false;
+  bool m_material_initialized = false;
   bool m_newton_solver_converged = false;
   bool m_check_with_bilinear_operator = false;
 
