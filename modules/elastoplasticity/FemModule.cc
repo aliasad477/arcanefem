@@ -711,7 +711,7 @@ _assembleBilinearOperator()
     auto command = makeCommand(acceleratorMng()->defaultQueue());
     auto in_node_coord = Accelerator::viewIn(command, m_node_coord);
     auto in_C_tang_2d = Accelerator::viewIn(command, m_C_tang_2d_cell);
-    auto in_C_tang_3d = Accelerator::viewIn(command, m_C_tang_2d_cell); // Maybe should be m_C_tang_3d_cell instead of m_C_tang_2d_cell
+    // auto in_C_tang_3d = Accelerator::viewIn(command, m_C_tang_3d_cell); // not implemented
 
     Real lambda_cell = lambda;
     Real mu_cell = mu;
@@ -737,7 +737,7 @@ _assembleBilinearOperator()
     auto command = makeCommand(acceleratorMng()->defaultQueue());
     auto in_node_coord = Accelerator::viewIn(command, m_node_coord);
     auto in_C_tang_2d = Accelerator::viewIn(command, m_C_tang_2d_cell);
-    auto in_C_tang_3d = Accelerator::viewIn(command, m_C_tang_2d_cell); // Maybe should be m_C_tang_3d_cell instead of m_C_tang_2d_cell
+    // auto in_C_tang_3d = Accelerator::viewIn(command, m_C_tang_3d_cell); // not implemented
 
     Real lambda_cell = lambda;
     Real mu_cell = mu;

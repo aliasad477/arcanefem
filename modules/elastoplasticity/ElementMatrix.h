@@ -134,7 +134,7 @@ ARCCORE_HOST_DEVICE RealMatrix<2, 6> computeElementVectorTria3GpuBase(Real3 dxu,
   RealVector<6> epsxx = { dxu[0], 0., dxu[1], 0., dxu[2], 0. };
   RealVector<6> epsyy = { 0., dyu[0], 0., dyu[1], 0., dyu[2] };
   RealVector<6> epsxy = { dyu[0], dxu[0], dyu[1], dxu[1], dyu[2], dxu[2] };
-  epsxy = math::sqrt(2.) * epsxy;
+  epsxy = 0.70710678118654746172 * epsxy;
 
   // ∫∫ C_tang11 ∂𝑢𝑥/∂𝑥 ∂𝑣𝑥/∂𝑥 + C_tang12 ∂𝑢𝑦/∂𝑦 ∂𝑣𝑥/∂𝑥 + C_tang13 (∂𝑢𝑦/∂𝑥 + ∂𝑢𝑥/∂𝑦) ∂𝑣𝑥/∂𝑥
   RealVector<6> sigmaXepsxx_x = (C_tang(0, 0) * epsxx(node_lid*2) + C_tang(0, 1) * epsyy(node_lid*2) + C_tang(0, 2) * epsxy(node_lid*2)) * epsxx;

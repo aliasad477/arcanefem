@@ -153,6 +153,15 @@ if (FEMUTILS_HAS_SOLVER_BACKEND_PETSC)
           -A,//fem/matrix-format=BSR
           inputs/2D.quater.cylinder.vonMises.arc)
 
+  arcanefem_add_full_test(NAME 2D_quarter_cylinder_von_mises_af-bsr
+          COMMAND ./Elastoplasticity
+          ARGS
+          -A,//fem/solution-comparison-file=check/2D.quater.cylinder.t20.txt
+          -A,//fem/linear-system/@name=AlephLinearSystem
+          -A,//fem/linear-system/epsilon=1.0e-12
+          -A,//fem/matrix-format=AF-BSR
+          inputs/2D.quater.cylinder.vonMises.arc)
+
   set(SOLVER_PETSC_DIRECT_CG
           -A,//fem/linear-system/@name=PetscLinearSystem
           -A,//fem/linear-system/solver=cg
