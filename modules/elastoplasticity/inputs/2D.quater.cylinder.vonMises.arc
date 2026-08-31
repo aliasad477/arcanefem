@@ -16,9 +16,6 @@
   <meshes>
     <mesh>
       <filename>meshes/quater_cylinder.msh</filename>
-      <subdivider>
-        <nb-subdivision>0</nb-subdivision>
-      </subdivider>
     </mesh>
   </meshes>
 
@@ -31,9 +28,6 @@
     <nu>0.3</nu>
     <sig0>250.</sig0>
     <f>NULL NULL</f>
-    <linear-system name="AlephLinearSystem">
-      <epsilon>1.0e-12</epsilon>
-    </linear-system>
     <boundary-conditions>
       <dirichlet>
         <surface>left</surface>

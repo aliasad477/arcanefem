@@ -71,14 +71,16 @@ if (FEMUTILS_HAS_SOLVER_BACKEND_PETSC)
   arcanefem_add_seq_test(NAME 2D_bar_parse_and_exit
           COMMAND ./Elastoplasticity
           ARGS
-          -A,//fem/nonlinear-law=true
-          -A,//fem/assemble-nonlinear-system=false
-          -A,//fem/solve-nonlinear-system=false
+          -A,//fem/assemble-linear-system=false
+          -A,//fem/solve-linear-system=false
           inputs/bar.2D.Dirichlet.bodyForce.arc)
 
   arcanefem_add_seq_test(NAME 2D_quarter_cylinder_von_mises
           COMMAND ./Elastoplasticity
           ARGS
+          -A,//fem/linear-system/@name=AlephLinearSystem
+          -A,//fem/linear-system/epsilon=1.0e-12
+          -A,//fem/solution-comparison-file=check/2D.quater.cylinder.t20.txt
           inputs/2D.quater.cylinder.vonMises.arc)
 
   arcanefem_add_seq_test(NAME 3D_bar_parse_and_exit
@@ -141,6 +143,15 @@ if (FEMUTILS_HAS_SOLVER_BACKEND_PETSC)
           -A,//fem/solution-comparison-file=check/bar.2D.traction.bodyforce.txt
           -A,//fem/matrix-format=AF-BSR
           inputs/bar.2D.traction.bodyforce.arc)
+
+  arcanefem_add_full_test(NAME 2D_quarter_cylinder_von_mises_bsr
+          COMMAND ./Elastoplasticity
+          ARGS
+          -A,//fem/solution-comparison-file=check/2D.quater.cylinder.t20.txt
+          -A,//fem/linear-system/@name=AlephLinearSystem
+          -A,//fem/linear-system/epsilon=1.0e-12
+          -A,//fem/matrix-format=BSR
+          inputs/2D.quater.cylinder.vonMises.arc)
 
   set(SOLVER_PETSC_DIRECT_CG
           -A,//fem/linear-system/@name=PetscLinearSystem
@@ -352,5 +363,4 @@ if (FEMUTILS_HAS_SOLVER_BACKEND_HYPRE)
           -A,//fem/matrix-format=AF-BSR
           ${SOLVER_HYPRE_CG}
           inputs/bar.2D.traction.bodyforce.arc)
-
 endif ()

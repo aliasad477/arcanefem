@@ -99,9 +99,9 @@ class FemModuleElastoplasticity
 
   // List of CaseTable for traction boundary conditions
   UniqueArray<CaseTableInfo> m_traction_case_table_list;
-  Real t;
-  Real dt;
-  Real tmax;
+  Real t = 0.;
+  Real dt = 0.;
+  Real tmax = 0.;
   Real E; // Youngs modulus
   Real nu; // Poisson ratio
   Real sig0; // Yield strength
@@ -109,6 +109,7 @@ class FemModuleElastoplasticity
   Real lambda;
   Real Et; // Tangent modulus
   Real H; // Hardening modulus
+  Real Qlim; // Limiting pressure
   Real m_newton_atol;
   Real m_newton_rtol;
   Real m_residual_norm0 = 0.0;

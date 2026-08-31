@@ -239,6 +239,7 @@ _doStationarySolve()
   }
 
   if(m_cross_validation){
+    if (t > 0. && t==tmax)
     _validateResults();
   }
 
@@ -293,6 +294,9 @@ _solveLinear()
 void FemModuleElastoplasticity::
 _solveNewton()
 {
+  if (!m_assemble_nonlinear_system)
+    return;
+
   info() << "[ArcaneFem-Info] Started module  _solveNewton()";
 
   _getMaterialParameters();
@@ -484,9 +488,11 @@ _solveNewton()
   if (m_newton_solver_converged) {
     info() << "[ArcaneFem-Info] Newton solver converged after " << m_newton_iter << " iterations.";
 
-    Real Ri = 1.0;
-    Real Re = 1.3;
-    Real Qlim = 2./math::sqrt(3.) * math::log( Re/Ri) * sig0;
+    if (t == dt) {
+      Real Ri = 1.0;
+      Real Re = 1.3;
+      Qlim = 2./math::sqrt(3.) * math::log( Re/Ri) * sig0;
+    }
     Real tl = math::sqrt(1.1 / tmax * (t));
 
     info() << "[ArcaneFem-Info] At Time Step " << t - 1 << ":\tPressure applied: " << Qlim * tl << "\tNewton iters: " << m_newton_iter << "\tresidual norm: " << m_residual_norm;
@@ -846,16 +852,9 @@ _validateResults()
   info() << "[ArcaneFem-Info] Started module  _validateResults()";
   Real elapsedTime = platform::getRealTime();
 
-  if (allNodes().size() < 200) {
-    int p = std::cout.precision();
-    std::cout.precision(17);
-    ENUMERATE_ (Node, inode, allNodes()) {
-      Node node = *inode;
-      std::cout << "( N_id, u1, u2, u3 ) = ( "
-                << node.uniqueId() << ", " << m_DU[node].x << ", " << m_DU[node].y << ", " << m_DU[node].z
-                << ")\n";
-    }
-    std::cout.precision(p);
+  ENUMERATE_ (Node, inode, allNodes()) {
+    Node node = *inode;
+    info() << "U["<< node.uniqueId() << "] = " << m_DU[node].x << " " << m_DU[node].y << " " << m_DU[node].z;
   }
 
   String filename = options()->solutionComparisonFile();
