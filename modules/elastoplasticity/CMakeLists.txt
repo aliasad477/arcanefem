@@ -165,7 +165,8 @@ if (FEMUTILS_HAS_SOLVER_BACKEND_PETSC)
   set(SOLVER_PETSC_DIRECT_CG
           -A,//fem/linear-system/@name=PetscLinearSystem
           -A,//fem/linear-system/solver=cg
-          -A,//fem/linear-system/atol=1e-9
+          -A,//fem/linear-system/max-iter=5000
+          -A,//fem/linear-system/atol=1e-12
           -A,//fem/linear-system/rtol=0)
 
   set(SOLVER_PETSC_DIRECT_GMRES
@@ -275,6 +276,22 @@ if (FEMUTILS_HAS_SOLVER_BACKEND_PETSC)
           ${SOLVER_PETSC_DIRECT_CG}
           inputs/bar.2D.traction.bodyforce.arc)
 
+  arcanefem_add_full_test(NAME 2D_quarter_cylinder_von_mises_bsr_petsc-direct
+          COMMAND ./Elastoplasticity
+          ARGS
+          -A,//fem/solution-comparison-file=check/2D.quater.cylinder.t20.txt
+          -A,//fem/matrix-format=BSR
+          ${SOLVER_PETSC_DIRECT_CG}
+          inputs/2D.quater.cylinder.vonMises.arc)
+
+  arcanefem_add_full_test(NAME 2D_quarter_cylinder_von_mises_af-bsr_petsc-direct
+          COMMAND ./Elastoplasticity
+          ARGS
+          -A,//fem/solution-comparison-file=check/2D.quater.cylinder.t20.txt
+          -A,//fem/matrix-format=AF-BSR
+          ${SOLVER_PETSC_DIRECT_CG}
+          inputs/2D.quater.cylinder.vonMises.arc)
+
   if (FEMUTILS_HAS_PARALLEL_SOLVER)
 
     arcanefem_add_mpi_test(NAME 2D_Dirichlet_cartesian
@@ -372,4 +389,21 @@ if (FEMUTILS_HAS_SOLVER_BACKEND_HYPRE)
           -A,//fem/matrix-format=AF-BSR
           ${SOLVER_HYPRE_CG}
           inputs/bar.2D.traction.bodyforce.arc)
+
+  arcanefem_add_full_test(NAME 2D_quarter_cylinder_von_mises_bsr_hypre
+          COMMAND ./Elastoplasticity
+          ARGS
+          -A,//fem/solution-comparison-file=check/2D.quater.cylinder.t20.txt
+          -A,//fem/matrix-format=BSR
+          ${SOLVER_HYPRE_CG}
+          inputs/2D.quater.cylinder.vonMises.arc)
+
+  arcanefem_add_full_test(NAME 2D_quarter_cylinder_von_mises_af-bsr_hypre
+          COMMAND ./Elastoplasticity
+          ARGS
+          -A,//fem/solution-comparison-file=check/2D.quater.cylinder.t20.txt
+          -A,//fem/matrix-format=AF-BSR
+          ${SOLVER_HYPRE_CG}
+          inputs/2D.quater.cylinder.vonMises.arc)
+
 endif ()

@@ -90,6 +90,7 @@ class FemModuleElastoplasticity
   void _assembleDirichlets0Gpu();
 
   inline void _applyInternalBodyForceTria3Gpu(VariableDoFReal& rhs_values, const FemDoFsOnNodes& dofs_on_nodes, const VariableNodeReal3& node_coord, IMesh* mesh, RunQueue* queue);
+  inline void _applyInternalBodyForceVonMisesTria3Gpu(VariableDoFReal& rhs_values, const FemDoFsOnNodes& dofs_on_nodes, const VariableNodeReal3& node_coord, IMesh* mesh, RunQueue* queue);
 
  private:
 
