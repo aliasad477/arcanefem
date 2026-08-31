@@ -109,10 +109,11 @@ class FemModuleElastoplasticity
   Real lambda;
   Real Et; // Tangent modulus
   Real H; // Hardening modulus
-  Real Qlim; // Limiting pressure
   Real m_newton_atol;
   Real m_newton_rtol;
   Real m_residual_norm0 = 0.0;
+  Real m_increment_norm = 0.0;
+  Real m_residual_norm = 0.0;
 
   Real3 f;
 

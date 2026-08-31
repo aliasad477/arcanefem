@@ -483,6 +483,14 @@ _solveNewton()
 
   if (m_newton_solver_converged) {
     info() << "[ArcaneFem-Info] Newton solver converged after " << m_newton_iter << " iterations.";
+
+    Real Ri = 1.0;
+    Real Re = 1.3;
+    Real Qlim = 2./math::sqrt(3.) * math::log( Re/Ri) * sig0;
+    Real tl = math::sqrt(1.1 / tmax * (t));
+
+    info() << "[ArcaneFem-Info] At Time Step " << t - 1 << ":\tPressure applied: " << Qlim * tl << "\tNewton iters: " << m_newton_iter << "\tresidual norm: " << m_residual_norm;
+
     m_newton_solver_converged = false;
     m_newton_iter = 0;
   }
@@ -514,7 +522,6 @@ _solveNewton()
       m_p_old_2d_gp(cell, iGP) += m_dp_2d_gp(cell, iGP);
     }
   }
-
 
 
 }
@@ -1066,7 +1073,7 @@ _checkNewtonConvergence()
   Real l2_norm_du = _norm_l2(m_dU);
   Real l2_norm_u = _norm_l2(m_DU);
 
-  Real increment_norm = l2_norm_u != 0.0 ? l2_norm_du / l2_norm_u : 1.0;
+  m_increment_norm = l2_norm_u != 0.0 ? l2_norm_du / l2_norm_u : 1.0;
   Real convergence_error_increment = l2_norm_du / (m_newton_rtol * l2_norm_u  + m_newton_atol);
 
   VariableDoFReal& residual_values(m_linear_system.rhsVariable());
@@ -1075,21 +1082,30 @@ _checkNewtonConvergence()
 
   Real l2_norm_rhs = _norm_l2(residual_values, node_dof);
 
-  Real residual_norm = l2_norm_rhs!=0 ? l2_norm_rhs / m_residual_norm0 : 1.0;
+  m_residual_norm = l2_norm_rhs!=0 ? l2_norm_rhs / m_residual_norm0 : 1.0;
   Real convergence_error_residual = l2_norm_rhs / (m_residual_norm0 + 1e-30);
 
   // The OR criterion follows petsc SNES
   if (convergence_error_residual <= m_newton_rtol) {
     m_newton_solver_converged = true;
     m_newton_converged_reason = "RESIDUAL_CONVERGED";
-    info() << "[ArcaneFem-Info] At Newton iteration "<< m_newton_iter <<": ||X_k+1 - X_k||/||X_k+1|| = " << increment_norm << " ||(F_ext - F_int(X_k))||/||(F_ext - F_int(X_0))|| = " << residual_norm << " => " << "CONVERGED with " << m_newton_converged_reason;
+    info() << "[ArcaneFem-Info] At Newton iteration " << m_newton_iter
+           << ": ||X_k+1 - X_k||/||X_k+1|| = " << m_increment_norm
+           << " ||(F_ext - F_int(X_k))||/||(F_ext - F_int(X_0))|| = " << m_residual_norm
+           << " => " << "CONVERGED with " << m_newton_converged_reason;
   } else if (convergence_error_increment <= 1.0) {
     m_newton_solver_converged = true;
     m_newton_converged_reason = "INCREMENT_CONVERGED";
-    info() << "[ArcaneFem-Info] At Newton iteration "<< m_newton_iter <<": ||X_k+1 - X_k||/||X_k+1|| = " << increment_norm << " ||(F_ext - F_int(X_k))||/||(F_ext - F_int(X_0))|| = " << residual_norm << " => " << "CONVERGED with " << m_newton_converged_reason;
+    info() << "[ArcaneFem-Info] At Newton iteration " << m_newton_iter
+           << ": ||X_k+1 - X_k||/||X_k+1|| = " << m_increment_norm
+           << " ||(F_ext - F_int(X_k))||/||(F_ext - F_int(X_0))|| = " << m_residual_norm
+           << " => " << "CONVERGED with " << m_newton_converged_reason;
   } else {
     m_newton_solver_converged = false;
-    info() << "[ArcaneFem-Info] At Newton iteration "<< m_newton_iter <<": ||X_k+1 - X_k||/||X_k+1|| = " << increment_norm << " ||(F_ext - F_int(X_k))||/||(F_ext - F_int(X_0))|| = " << residual_norm << " => " << "NOT CONVERGED";
+    info() << "[ArcaneFem-Info] At Newton iteration " << m_newton_iter
+           << ": ||X_k+1 - X_k||/||X_k+1|| = " << m_increment_norm
+           << " ||(F_ext - F_int(X_k))||/||(F_ext - F_int(X_0))|| = " << m_residual_norm
+           << " => " << "NOT CONVERGED";
   }
 
     elapsedTime = platform::getRealTime() - elapsedTime;
