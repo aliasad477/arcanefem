@@ -599,24 +599,25 @@ class ArcaneFemFunctions
 
     /*---------------------------------------------------------------------------*/
     /**
-     * @brief Computes the gradients of given function U for P1 triangles.
+     * @brief Computes the gradients of given scalar function U for P1 triangles.
      *
      * This method calculates gradient operator ∇ Ui for a given P1 cell
-     * with i = 1,..,3 for the three values of Ui hence  at  cell nodes.
-     * The output is ∇ Ui is P0 (piece-wise constant) hence Real3  value
+     * with i = 1,..,3 for the three scalar values of Ui hence at cell nodes.
+     * The output is ∇ Ui is P0 (piece-wise constant) hence Real3 value
      * per cell
      *
      *         ∇ Ui = [ ∂U/∂𝑥   ∂U/∂𝑦   ∂U/∂𝑧 ]
      *
-     *         ∂U/∂𝑥 = ( u1*(y2 − y3) + u2*(y3 − y1) + u3*(y1 − y2) ) / (2*A)
-     *         ∂U/∂𝑦 = ( u1*(x3 − x2) + u2*(x1 − x3) + u3*(x2 − x1) ) / (2*A)
-     *         ∂U/∂𝑧 = 0
+     * @param cell The Tria3 cell entity.
+     * @param node_coord The coordinates of the mesh nodes.
+     * @param u The variable Ui defined at the nodes.
+     *
+     * @return A Real3 vector of the gradient ∇Ui = {∂U/∂𝑥, ∂U/∂𝑦, 0} at the cell center.
      *
      * @note we can adapt the same for 3D by filling the third component
      */
     /*---------------------------------------------------------------------------*/
-
-    static inline Real3 computeGradientTria3(Cell cell, const VariableNodeReal3& node_coord, VariableNodeReal u)
+    static inline Real3 computeGradientTria3(Cell cell, const VariableNodeReal3& node_coord, const VariableNodeReal& u)
     {
       Real3 n0 = node_coord[cell.nodeId(0)];
       Real3 n1 = node_coord[cell.nodeId(1)];
@@ -631,7 +632,27 @@ class ArcaneFemFunctions
       return { (u0 * (n1.y - n2.y) + u1 * (n2.y - n0.y) + u2 * (n0.y - n1.y)) / A2, (u0 * (n2.x - n1.x) + u1 * (n0.x - n2.x) + u2 * (n1.x - n0.x)) / A2, 0 };
     }
 
-    static inline Real3x3 computeGradientTria3(Cell cell, const VariableNodeReal3& node_coord, VariableNodeReal3 u)
+    /*---------------------------------------------------------------------------*/
+    /**
+     * @brief Computes the gradients of given vector function U for P1 triangles.
+     *
+     * This method calculates gradient operator ∇ Ui for a given P1 cell
+     * with i = 1,..,3 for the three vector values of Ui hence at cell nodes.
+     * The output is ∇ Ui is P0 (piece-wise constant) hence Real3x3 value
+     * per cell
+     *
+     *         ∇ Ui = [ ∂U/∂𝑥   ∂U/∂𝑦   ∂U/∂𝑧 ]
+     *
+     * @param cell The Tria3 cell entity.
+     * @param node_coord The coordinates of the mesh nodes.
+     * @param u The variable Ui defined at the nodes.
+     *
+     * @return A Real3x3 vector of the gradient ∇Ui = {∂U/∂𝑥, ∂U/∂𝑦, 0} at the cell center.
+     *
+     * @note we can adapt the same for 3D by filling the third component
+     */
+    /*---------------------------------------------------------------------------*/
+    static inline Real3x3 computeGradientTria3(Cell cell, const VariableNodeReal3& node_coord, const VariableNodeReal3& u)
     {
       Real3 n0 = node_coord[cell.nodeId(0)];
       Real3 n1 = node_coord[cell.nodeId(1)];
@@ -846,10 +867,18 @@ class ArcaneFemFunctions
     /**
      * @brief Computes the gradient of a scalar field 'u' for a Quad4 element.
      *
+     * This method calculates gradient operator ∇ Ui for a given P1 cell
+     * with i = 1,..,4 for the four scalar values of Ui hence at cell nodes.
+     * The output is ∇ Ui is P0 (piece-wise constant) hence Real3 value
+     * per cell
+     *
+     *         ∇ Ui = [ ∂U/∂𝑥   ∂U/∂𝑦   ∂U/∂𝑧 ]
+     *
      * @param cell The Quad4 cell entity.
      * @param node_coord The coordinates of the mesh nodes.
-     * @param u The variable 𝑢 defined at the nodes.
-     * @return A Real3 vector of the gradient ∇𝑢 = {∂𝑢/∂𝑥, ∂𝑢/∂𝑦, 0} at the cell center.
+     * @param u The variable Ui defined at the nodes.
+     *
+     * @return A Real3 vector of the gradient ∇Ui = {∂U/∂𝑥, ∂U/∂𝑦, 0} at the cell center.
      */
     /*---------------------------------------------------------------------------*/
     static inline Real3
@@ -881,6 +910,26 @@ class ArcaneFemFunctions
       return { grad_x, grad_y, 0.0 };
     }
 
+    /*---------------------------------------------------------------------------*/
+    /**
+     * @brief Computes the gradient of a vector field 'u' for a Quad4 element.
+     *
+     * This method calculates gradient operator ∇ Ui for a given P1 cell
+     * with i = 1,..,4 for the four vector values of Ui hence at cell nodes.
+     * The output is ∇ Ui is P0 (piece-wise constant) hence Real3x3 value
+     * per cell
+     *
+     *         ∇ Ui = [ ∂U/∂𝑥   ∂U/∂𝑦   ∂U/∂𝑧 ]
+     *
+     * @param cell The Quad4 cell entity.
+     * @param node_coord The coordinates of the mesh nodes.
+     * @param u The variable Ui defined at the nodes.
+     * @param xi The first coordinate of quadrature point.
+     * @param eta The second coordinate of quadrature point.
+     *
+     * @return A Real3x3 vector of the gradient ∇Ui = {∂U/∂𝑥, ∂U/∂𝑦, 0} at the cell center.
+     */
+    /*---------------------------------------------------------------------------*/
     static inline Real3x3
     computeGradientQuad4(Cell cell, const VariableNodeReal3& node_coord, const VariableNodeReal3& u, const Real xi, const Real eta)
     {
@@ -1072,8 +1121,27 @@ class ArcaneFemFunctions
       return dz;
     }
 
-
-    static inline Real3 computeGradientTetra4(Cell cell, const VariableNodeReal3& node_coord, VariableNodeReal u)
+    /*---------------------------------------------------------------------------*/
+    /**
+     * @brief Computes the gradients of given scalar function U for P1 tetrahedrals.
+     *
+     * This method calculates gradient operator ∇ Ui for a given P1 cell
+     * with i = 1,..,4 for the four scalar values of Ui hence at cell nodes.
+     * The output is ∇ Ui is P0 (piece-wise constant) hence Real3 value
+     * per cell
+     *
+     *         ∇ Ui = [ ∂U/∂𝑥   ∂U/∂𝑦   ∂U/∂𝑧 ]
+     *
+     * @param cell The Tetra4 cell entity.
+     * @param node_coord The coordinates of the mesh nodes.
+     * @param u The variable Ui defined at the nodes.
+     *
+     * @return A Real3 vector of the gradient ∇Ui = {∂U/∂𝑥, ∂U/∂𝑦, ∂U/∂𝑧}
+     * at the cell center.
+     *
+     */
+    /*---------------------------------------------------------------------------*/
+    static inline Real3 computeGradientTetra4(Cell cell, const VariableNodeReal3& node_coord, const VariableNodeReal& u)
     {
       Real3 m0 = node_coord[cell.nodeId(0)];
       Real3 m1 = node_coord[cell.nodeId(1)];
@@ -1109,7 +1177,27 @@ class ArcaneFemFunctions
       return grad;
     }
 
-    static inline Real3x3 computeGradientTetra4(Cell cell, const VariableNodeReal3& node_coord, VariableNodeReal3 u)
+    /*---------------------------------------------------------------------------*/
+    /**
+     * @brief Computes the gradients of given vector function U for P1 tetrahedrals.
+     *
+     * This method calculates gradient operator ∇ Ui for a given P1 cell
+     * with i = 1,..,4 for the four vector values of Ui hence at cell nodes.
+     * The output is ∇ Ui is P0 (piece-wise constant) hence Real3x3 value
+     * per cell
+     *
+     *         ∇ Ui = [ ∂U/∂𝑥   ∂U/∂𝑦   ∂U/∂𝑧 ]
+     *
+     * @param cell The Tetra4 cell entity.
+     * @param node_coord The coordinates of the mesh nodes.
+     * @param u The variable Ui defined at the nodes.
+     *
+     * @return A Real3x3 vector of the gradient ∇Ui = {∂U/∂𝑥, ∂U/∂𝑦, ∂U/∂𝑧}
+     * at the cell center.
+     *
+     */
+    /*---------------------------------------------------------------------------*/
+    static inline Real3x3 computeGradientTetra4(Cell cell, const VariableNodeReal3& node_coord, const VariableNodeReal3& u)
     {
       Real3 m0 = node_coord[cell.nodeId(0)];
       Real3 m1 = node_coord[cell.nodeId(1)];
@@ -1250,12 +1338,21 @@ class ArcaneFemFunctions
 
     /*---------------------------------------------------------------------------*/
     /**
-     * @brief Computes the gradient of a field 'u' for a Hexa8 element.
+     * @brief Computes the gradient of a scalar field 'u' for a Hexa8 element.
+     *
+     * This method calculates gradient operator ∇ Ui for a given P1 cell
+     * with i = 1,..,8 for the eight vector values of Ui hence at cell nodes.
+     * The output is ∇ Ui is P0 (piece-wise constant) hence Real3 value
+     * per cell
+     *
+     *         ∇ Ui = [ ∂U/∂𝑥   ∂U/∂𝑦   ∂U/∂𝑧 ]
      *
      * @param cell The Hexa8 cell entity.
      * @param node_coord The coordinates of the mesh nodes.
-     * @param u The variable 𝑢 defined at the nodes.
-     * @return A Real3 vector of the gradient ∇𝑢 = {∂𝑢/∂𝑥, ∂𝑢/∂𝑦, ∂𝑢/∂𝑧} at the cell center.
+     * @param u The variable Ui defined at the nodes.
+     *
+     * @return A Real3 vector of the gradient ∇Ui = {∂U/∂𝑥, ∂U/∂𝑦, ∂U/∂𝑧}
+     * at the cell center.
      */
     /*---------------------------------------------------------------------------*/
     static inline Real3
@@ -1295,7 +1392,29 @@ class ArcaneFemFunctions
       return { grad_x, grad_y, grad_z };
     }
 
-  static inline Real3x3
+    /*---------------------------------------------------------------------------*/
+    /**
+     * @brief Computes the gradient of a vector field 'u' for a Hexa8 element.
+     *
+     * This method calculates gradient operator ∇ Ui for a given P1 cell
+     * with i = 1,..,8 for the eight vector values of Ui hence at cell nodes.
+     * The output is ∇ Ui is P0 (piece-wise constant) hence Real3x3 value
+     * per cell
+     *
+     *         ∇ Ui = [ ∂U/∂𝑥   ∂U/∂𝑦   ∂U/∂𝑧 ]
+     *
+     * @param cell The Hexa8 cell entity.
+     * @param node_coord The coordinates of the mesh nodes.
+     * @param u The variable Ui defined at the nodes.
+     * @param xi The first coordinate of quadrature point.
+     * @param eta The second coordinate of quadrature point.
+     * @param zeta The third coordinate of quadrature point.
+     *
+     * @return A Real3x3 vector of the gradient ∇Ui = {∂U/∂𝑥, ∂U/∂𝑦, ∂U/∂𝑧}
+     * at the cell center.
+     */
+    /*---------------------------------------------------------------------------*/
+    static inline Real3x3
     computeGradientHexa8(Cell cell, const VariableNodeReal3& node_coord, const VariableNodeReal3& u, const Real xi, const Real eta, const Real zeta)
     {
       // get shape function gradients w.r.t (𝑥,𝑦) and determinant of Jacobian at (ξ,η,ζ)
@@ -3035,12 +3154,9 @@ class ArcaneFemFunctions
       ENUMERATE_ (Face, iface, group) {
         Face face = *iface;
         Real length = ArcaneFemFunctions::MeshOperation::computeLengthEdge2(face, node_coord);
-        Real2 normal = ArcaneFemFunctions::MeshOperation::computeNormalEdge2(face, node_coord);
 
         for (Node node : iface->nodes()) {
           if (node.isOwn()) {
-            // rhs_values[node_dof.dofId(node, 0)] += (t[0] * normal.x + t[1] * normal.y) * length / 2.;
-            // rhs_values[node_dof.dofId(node, 1)] += (t[0] * normal.x + t[1] * normal.y) * length / 2.;
             rhs_values[node_dof.dofId(node, 0)] += t[0] * length / 2.;
             rhs_values[node_dof.dofId(node, 1)] += t[1] * length / 2.;
           }
@@ -3077,7 +3193,6 @@ class ArcaneFemFunctions
         constexpr Real weights[2] = { 1.0, 1.0 };
 
         Real length = ArcaneFemFunctions::MeshOperation::computeLengthEdge2(face, node_coord);
-        Real2 normal = ArcaneFemFunctions::MeshOperation::computeNormalEdge2(face, node_coord);
 
         Node node0 = face.node(0);
         Node node1 = face.node(1);
@@ -3151,11 +3266,8 @@ class ArcaneFemFunctions
       ENUMERATE_ (Face, iface, group) {
         Face face = *iface;
         Real length = ArcaneFemFunctions::MeshOperation::computeLengthEdge2(face, node_coord);
-        Real2 normal = ArcaneFemFunctions::MeshOperation::computeNormalEdge2(face, node_coord);
         for (Node node : iface->nodes()) {
           if (node.isOwn()) {
-            // rhs_values[node_dof.dofId(node, 0)] += (trac[0] * normal.x + trac[1] * normal.y) * length / 2.;
-            // rhs_values[node_dof.dofId(node, 1)] += (trac[0] * normal.x + trac[1] * normal.y) * length / 2.;
             rhs_values[node_dof.dofId(node, 0)] += (trac[0]) * length / 2.;
             rhs_values[node_dof.dofId(node, 1)] += (trac[1]) * length / 2.;
           }
@@ -3199,7 +3311,6 @@ class ArcaneFemFunctions
         constexpr Real weights[2] = { 1.0, 1.0 };
 
         Real length = ArcaneFemFunctions::MeshOperation::computeLengthEdge2(face, node_coord);
-        Real2 normal = ArcaneFemFunctions::MeshOperation::computeNormalEdge2(face, node_coord);
 
         Node node0 = face.node(0);
         Node node1 = face.node(1);
