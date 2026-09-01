@@ -57,8 +57,6 @@ add_library(FemUtils
   FemBoundaryConditions_axl.h
   MeshTensorVariable.h
   MeshTensorVariable.H
-  MeshMatrixVariables.h
-  MeshMatrixVariablesHelpers.h
   internal/IDoFLinearSystemImpl.h
   internal/OrderedRowColumnMap.h
   internal/CsrDoFLinearSystemImpl.h

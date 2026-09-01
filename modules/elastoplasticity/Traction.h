@@ -46,7 +46,7 @@ _applyTraction(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView
         is_transient_traction ? transientTraction(ArcaneFemFunctions::BoundaryConditions2D::applyTractionTableToRhsQuad4)
                               : constantTraction(ArcaneFemFunctions::BoundaryConditions2D::applyTractionToRhsQuad4);
       else
-        is_transient_traction ? transientTraction(_applyTractionTableToRhsTria3)
+        is_transient_traction ? transientTraction(_applyPressureTableToRhsTria3)
                               : constantTraction(ArcaneFemFunctions::BoundaryConditions2D::applyTractionToRhsTria3);
     }
     else if (mesh()->dimension() == 3) {
@@ -62,7 +62,7 @@ _applyTraction(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView
 
 
 inline void FemModuleElastoplasticity::
-_applyTractionTableToRhsTria3(BC::ITractionBoundaryCondition* bs, const Real t, Int32 boundary_condition_index, const UniqueArray<Arcane::FemUtils::CaseTableInfo>& traction_case_table_list, const IndexedNodeDoFConnectivityView& node_dof, const VariableNodeReal3& node_coord, VariableDoFReal& rhs_values)
+_applyPressureTableToRhsTria3(BC::ITractionBoundaryCondition* bs, const Real t, Int32 boundary_condition_index, const UniqueArray<Arcane::FemUtils::CaseTableInfo>& traction_case_table_list, const IndexedNodeDoFConnectivityView& node_dof, const VariableNodeReal3& node_coord, VariableDoFReal& rhs_values)
 {
   // mesh boundary group on which traction is applied
   FaceGroup group = bs->getSurface();

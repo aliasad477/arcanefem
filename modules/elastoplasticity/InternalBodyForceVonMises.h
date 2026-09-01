@@ -8,13 +8,14 @@
 /* InternalBodyForceRHSVonMises.h                              (C) 2000-2026 */
 /*                                                                           */
 /* Contains functions to compute and assemble source term contribution to RHS*/
+/* corresponding to the internal force term for VonMises plasticity law      */
 /*---------------------------------------------------------------------------*/
 /*---------------------------------------------------------------------------*/
 
 /*---------------------------------------------------------------------------*/
 /**
  * @brief Applies nonlinear internal body force term to RHS vector of
- * the linear system.
+ * the linear system for Von Mises plasticity law.
  * 
  * @param rhs_values The variable representing the RHS vector to be updated.
  * @param node_dof The connectivity view mapping nodes to their corresponding
