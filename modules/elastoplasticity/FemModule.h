@@ -40,9 +40,6 @@
 
 #include "ArcaneFemFunctions.h"
 #include "ArcaneFemFunctionsGpu.h"
-#include "MeshMatrixVariablesHelpers.h"
-#include "MeshTensorVariable.H"
-
 /*---------------------------------------------------------------------------*/
 /*---------------------------------------------------------------------------*/
 
