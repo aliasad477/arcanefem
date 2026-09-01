@@ -89,12 +89,12 @@ startInit()
 
       m_nGP = 1;
 
-      m_epsilon_2d_gp.reshape({m_nGP, 3});
+      // m_epsilon_2d_gp.reshape({m_nGP, 3}); // not needed to store for Von Mises law
       m_sigma_2d_gp.reshape({m_nGP, 3});
       m_sigma_old_2d_gp.reshape({m_nGP, 3});
-      m_sigma_trial_2d_gp.reshape({m_nGP, 3});
-      m_dev_2d_gp.reshape({m_nGP, 3});
-      m_flowN_2d_gp.reshape({m_nGP, 3});
+      // m_sigma_trial_2d_gp.reshape({m_nGP, 3}); // not needed to store for Von Mises law
+      // m_dev_2d_gp.reshape({m_nGP, 3}); // not needed to store for Von Mises law
+      // m_flowN_2d_gp.reshape({m_nGP, 3}); // not needed to store for Von Mises law
 
       m_sigma_zz_2d_gp.reshape({m_nGP});
       m_sigma_zz_old_2d_gp.reshape({m_nGP});
@@ -358,19 +358,11 @@ _solveNewton()
 
         // --- compute_trial_state ---- //
         // computeTrialStateVM();
-        // epsilon(DU)
+        // epsilon(DU) // NOTE: for nGP>1 it has to evaluated and interpolated at Gauss points
         Real3x3 grad_DU = ArcaneFemFunctions::FeOperation2D::FeOperation2D::computeGradientTria3(cell, m_node_coord, m_DU);
         Real eps_xx = grad_DU(0, 0);
         Real eps_yy = grad_DU(1, 1);
         Real eps_xy = M_SQRT1_2 * (grad_DU(0, 1) + grad_DU(1, 0));
-
-        //info() << "[ArcaneFem-Info] eps_xx = " << eps_xx << " eps_yy = " << eps_yy << " eps_xy = " << eps_xy;
-
-        m_epsilon_2d_gp(cell, iGP, 0) = eps_xx;
-        m_epsilon_2d_gp(cell, iGP, 1) = eps_yy;
-        m_epsilon_2d_gp(cell, iGP, 2) = eps_xy;
-
-        //info() << "[ArcaneFem-Info] eps_xx = " << eps_xx << " eps_yy = " << eps_yy << " eps_xy = " << eps_xy;
 
         Real sigma_trial_xx = m_sigma_old_2d_gp(cell, iGP, 0) + m_C_2d(0, 0) * eps_xx + m_C_2d(0, 1) * eps_yy + m_C_2d(0, 2) * eps_xy;
         Real sigma_trial_yy = m_sigma_old_2d_gp(cell, iGP, 1) + m_C_2d(1, 0) * eps_xx + m_C_2d(1, 1) * eps_yy + m_C_2d(1, 2) * eps_xy;
@@ -378,28 +370,16 @@ _solveNewton()
 
         Real sigma_trial_zz = m_sigma_zz_old_2d_gp(cell, iGP) + lambda * (eps_xx + eps_yy);
 
-        m_sigma_trial_2d_gp(cell, iGP, 0) = sigma_trial_xx;
-        m_sigma_trial_2d_gp(cell, iGP, 1) = sigma_trial_yy;
-        m_sigma_trial_2d_gp(cell, iGP, 2) = sigma_trial_xy;
-
         // Plane strain retains sigma_zz in the three-dimensional deviator.
         Real sigma_trial_mean = (sigma_trial_xx + sigma_trial_yy + sigma_trial_zz) / 3.0;
 
-        Real dev_xx = m_sigma_trial_2d_gp(cell, iGP, 0) - sigma_trial_mean;
-        Real dev_yy = m_sigma_trial_2d_gp(cell, iGP, 1) - sigma_trial_mean;
-        Real dev_xy = m_sigma_trial_2d_gp(cell, iGP, 2);
+        Real dev_xx = sigma_trial_xx - sigma_trial_mean;
+        Real dev_yy = sigma_trial_yy - sigma_trial_mean;
+        Real dev_xy = sigma_trial_xy;
 
         Real dev_zz = sigma_trial_zz - sigma_trial_mean;
 
-        m_dev_2d_gp(cell, iGP, 0) = dev_xx;
-        m_dev_2d_gp(cell, iGP, 1) = dev_yy;
-        m_dev_2d_gp(cell, iGP, 2) = dev_xy;
-
-        //info() << "[ArcaneFem-Info] dev_xx = " << dev_xx << " dev_yy = " << dev_yy << " dev_xy = " << dev_xy;
-
         Real sigma_eq_trial = math::sqrt(1.5 * (dev_xx * dev_xx + dev_yy * dev_yy + dev_zz * dev_zz + dev_xy * dev_xy) );
-
-        //info() << "[ArcaneFem-Info] sigma_eq_trial = " << sigma_eq_trial;
 
         // --- evaluate_yield_function ---- //
         // _computeYieldFunctionVM();
@@ -417,19 +397,11 @@ _solveNewton()
 
         Real beta = 3. * mu * m_dp_2d_gp(cell, iGP) / (sigma_eq_trial + 1e-14 * sig0);
 
-        m_flowN_2d_gp(cell, iGP, 0) = flowN_xx;
-        m_flowN_2d_gp(cell, iGP, 1) = flowN_yy;
-        m_flowN_2d_gp(cell, iGP, 2) = flowN_xy;
-
-        //info() << "[ArcaneFem-Info] flowN_xx = " << flowN_xx << " flowN_yy = " << flowN_yy << " flowN_xy = " << flowN_xy;
-        //info() << "[ArcaneFem-Info] flowN_zz = " << flowN_zz;
-        //info() << "[ArcaneFem-Info] beta = " << beta;
-
         // --- update_consistent_tangent ---- //
         // _updateStressTensorVM();
-        Real sigma_xx = m_sigma_trial_2d_gp(cell, iGP, 0) - dev_xx * beta;
-        Real sigma_yy = m_sigma_trial_2d_gp(cell, iGP, 1) - dev_yy * beta;
-        Real sigma_xy = m_sigma_trial_2d_gp(cell, iGP, 2) - dev_xy * beta;
+        Real sigma_xx = sigma_trial_xx - dev_xx * beta;
+        Real sigma_yy = sigma_trial_yy - dev_yy * beta;
+        Real sigma_xy = sigma_trial_xy - dev_xy * beta;
 
         Real sigma_zz = sigma_trial_zz - dev_zz * beta;
 
@@ -439,31 +411,21 @@ _solveNewton()
 
         m_sigma_zz_2d_gp(cell, iGP) = sigma_zz;
 
-        //info() << "[ArcaneFem-Info] sigma_xx = " << sigma_xx << " sigma_yy = " << sigma_yy << " sigma_xy = " << sigma_xy;
-        //info() << "[ArcaneFem-Info] sigma_zz = " << sigma_zz;
-
-        // _updateTangentMaterialTensorVM(); // NOTE if not we store everything and assemble locally with at element matrix assembly i.e., local gp technique.
+        // _updateTangentMaterialTensorVM();
         Real tangentA = 3.* mu * (3. * mu / (3. * mu + H) - beta);
-        //info() << "[ArcaneFem-Info] tangentA = " << tangentA;
 
-        // Consistent algorithmic tangent for the radial-return update:
         m_C_tang_2d_cell(cell, 0, 0) = m_C_2d(0, 0) - tangentA * flowN_xx * flowN_xx - 4. * mu * beta / 3.;
         m_C_tang_2d_cell(cell, 0, 1) = m_C_2d(0, 1) - tangentA * flowN_xx * flowN_yy + 2. * mu * beta / 3.;
         m_C_tang_2d_cell(cell, 0, 2) = m_C_2d(0, 2) - tangentA * flowN_xx * flowN_xy;
-
-        //info() << "[ArcaneFem-Info] C_tang row 1 done ";
 
         m_C_tang_2d_cell(cell, 1, 0) = m_C_2d(1, 0) - tangentA * flowN_xx * flowN_yy + 2. * mu * beta / 3.;
         m_C_tang_2d_cell(cell, 1, 1) = m_C_2d(1, 1) - tangentA * flowN_yy * flowN_yy - 4. * mu * beta / 3.;
         m_C_tang_2d_cell(cell, 1, 2) = m_C_2d(1, 2) - tangentA * flowN_yy * flowN_xy;
 
-        //info() << "[ArcaneFem-Info] C_tang row 2 done ";
-
         m_C_tang_2d_cell(cell, 2, 0) = m_C_2d(2, 0) - tangentA * flowN_xx * flowN_xy;
         m_C_tang_2d_cell(cell, 2, 1) = m_C_2d(2, 1) - tangentA * flowN_yy * flowN_xy;
         m_C_tang_2d_cell(cell, 2, 2) = m_C_2d(2, 2) - tangentA * flowN_xy * flowN_xy - 2. * mu * beta;
 
-        //info() << "[ArcaneFem-Info] C_tang row 3 done ";
       }
     }
 
@@ -605,10 +567,6 @@ _getMaterialParameters()
           m_sigma_old_2d_gp(icell, iGP, 1) = 0.;
           m_sigma_old_2d_gp(icell, iGP, 2) = 0.;
           m_sigma_zz_old_2d_gp(icell, iGP) = 0.;
-
-          m_sigma_trial_2d_gp(icell, iGP, 0) = 0.;
-          m_sigma_trial_2d_gp(icell, iGP, 1) = 0.;
-          m_sigma_trial_2d_gp(icell, iGP, 2) = 0.;
 
           m_p_old_2d_gp(icell, iGP) = 0.;
           m_dp_2d_gp(icell, iGP) = 0.;
