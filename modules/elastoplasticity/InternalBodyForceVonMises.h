@@ -34,8 +34,7 @@ _applyInternalBodyForceVonMises(VariableDoFReal& rhs_values, const IndexedNodeDo
     if (mesh()->dimension() == 2) {
       if (m_hex_quad_mesh) {
         ARCANE_FATAL("Not IMPLEMENTED");
-      }
-      else {
+      } else {
         _applyInternalBodyForceVonMisesTria3Gpu(rhs_values, m_dofs_on_nodes, m_node_coord, mesh_ptr, queue);
       }
     } else {

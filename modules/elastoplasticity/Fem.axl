@@ -24,23 +24,11 @@
     <variable field-name="C_tang_3d_cell" name="C_tang_3d_cell" data-type="real" item-kind="cell" shape-dim="2">
        <description>Tangent of the material tensor for 3D constitutive law</description>
     </variable>
-    <variable field-name="epsilon_2d_gp" name="epsilon_2d_gp" data-type="real" item-kind="cell" shape-dim="2">
-      <description>Strain tensor for 2D on gauss points</description>
-    </variable>
     <variable field-name="sigma_2d_gp" name="sigma_2d_gp" data-type="real" item-kind="cell" shape-dim="2">
       <description>Stress tensor for 2D on gauss points</description>
     </variable>
     <variable field-name="sigma_old_2d_gp" name="sigma_old_2d_gp" data-type="real" item-kind="cell" shape-dim="2">
       <description>Previous step stress tensor for 2D on gauss points</description>
-    </variable>
-    <variable field-name="sigma_trial_2d_gp" name="sigma_trial_2d_gp" data-type="real" item-kind="cell" shape-dim="2">
-      <description>Trial stress tensor for 2D on gauss points</description>
-    </variable>
-    <variable field-name="dev_2d_gp" name="dev_2d_gp" data-type="real" item-kind="cell" shape-dim="2">
-      <description>Deviatoric stress tensor for 2D on gauss points</description>
-    </variable>
-    <variable field-name="flowN_2d_gp" name="flowN_2d_gp" data-type="real" item-kind="cell" shape-dim="2">
-      <description>Radial return tensor for 2D on gauss points</description>
     </variable>
     <variable field-name="sigma_zz_2d_gp" name="sigma_zz_2d_gp" data-type="real" item-kind="cell" shape-dim="1">
       <description>zz component of stress tensor for 2D on gauss points</description>
@@ -58,18 +46,6 @@
   <options>
     <simple name = "f" type = "string[]" default="NULL NULL NULL" optional="true">
       <description>External body force vector (space separated list).</description>
-    </simple>
-
-    <simple name="E" type="real" default="0.0">
-      <description>Youngs Modulus of the material.</description>
-    </simple>
-
-    <simple name="nu" type="real" default="0.0">
-      <description>Poissons ratio of the material.</description>
-    </simple>
-
-    <simple name="sig0" type="real" default="0.0">
-      <description>Yeild strength of material.</description>
     </simple>
 
     <simple name="tmax" type="real" default="0.0">
@@ -112,9 +88,21 @@
       <description>Boolean to use hexagonal quadrature for element matrix assembly.</description>
     </simple>
 
-    <!-- - - - - - constitutive law for plasticity/elasticity - - - - -->
+    <!-- - - - - - constitutive law for plasticity/elasticity - - - - TODO make complex type - -->
     <simple name="constitutive-law" type="string" default="VonMises" optional="true">
-      <description>Which constitutive law to use VonMises|Hooke.</description>
+      <description>Which constitutive law to use VonMises|Drucker-Prager|Hooke.</description>
+    </simple>
+
+    <simple name="E" type="real" default="0.0">
+      <description>Youngs Modulus of the material.</description>
+    </simple>
+
+    <simple name="nu" type="real" default="0.0">
+      <description>Poissons ratio of the material.</description>
+    </simple>
+
+    <simple name="sig0" type="real" default="0.0">
+      <description>Yeild strength of material.</description>
     </simple>
 
     <!-- - - - - - nonlinear-analysis-parameters - - - - -->

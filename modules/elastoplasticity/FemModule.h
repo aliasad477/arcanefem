@@ -82,11 +82,9 @@ class FemModuleElastoplasticity
 
   void _doStationarySolve();
   void _assembleBilinearOperator();
-  void _assembleDirichletsGpu();
   void _assembleDirichletsNewtonGpu();
   void _assembleDirichlets0Gpu();
 
-  inline void _applyInternalBodyForceHookeTria3Gpu(VariableDoFReal& rhs_values, const FemDoFsOnNodes& dofs_on_nodes, const VariableNodeReal3& node_coord, IMesh* mesh, RunQueue* queue);
   inline void _applyInternalBodyForceVonMisesTria3Gpu(VariableDoFReal& rhs_values, const FemDoFsOnNodes& dofs_on_nodes, const VariableNodeReal3& node_coord, IMesh* mesh, RunQueue* queue);
 
  private:
@@ -158,24 +156,23 @@ class FemModuleElastoplasticity
   void _updateVariables();
   void _initBsr();
 
+  // Von Mises Law
+  inline void _restoreConvergedStateVonMises();
+  inline void _updateGlobalTangentMaterialTensorVonMises();
+  inline void _updateGlobalTangentMaterialTensorVonMisesTria3Cpu();
+
+  inline void _applyInternalBodyForceVonMises(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
+  inline void _applyInternalBodyForceVonMisesTria3Cpu(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
+
   inline void _applyExternalBodyForce(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
 
   inline void _applyTraction(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
   static inline void _applyPressureTableToRhsTria3(BC::ITractionBoundaryCondition* bs, const Real t, Int32 boundary_condition_index, const UniqueArray<Arcane::FemUtils::CaseTableInfo>& traction_case_table_list, const IndexedNodeDoFConnectivityView& node_dof, const VariableNodeReal3& node_coord, VariableDoFReal& rhs_values);
 
 
-  inline void _applyDirichlet(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
   inline void _applyDirichletNewton(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
   inline void _applyDirichlet0(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
 
-  inline void _applyInternalBodyForceHooke(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
-  inline void _applyInternalBodyForceHookeTria3Cpu(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
-  inline void _applyInternalBodyForceHookeQuad4(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
-  inline void _applyInternalBodyForceHookeTetra4(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
-  inline void _applyInternalBodyForceHookeHexa8(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
-
-  inline void _applyInternalBodyForceVonMises(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
-  inline void _applyInternalBodyForceVonMisesTria3Cpu(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
 
   inline Real _norm_l2(VariableNodeReal3& u);
   inline Real _norm_l2(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);

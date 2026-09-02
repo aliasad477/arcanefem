@@ -20,8 +20,8 @@
 #include "ExternalBodyForce.h"
 #include "Traction.h"
 #include "Dirichlet.h"
-#include "InternalBodyForceHooke.h"
 #include "InternalBodyForceVonMises.h"
+#include "VonMisesLaw.h"
 
 /*---------------------------------------------------------------------------*/
 /**
@@ -133,15 +133,9 @@ compute()
   info() << "[ArcaneFem-Info] Started module  compute()";
   Real elapsedTime = platform::getRealTime();
 
-    if (m_constitutive_law == "Hooke") {
-      // Stop code after computations
-      if (m_global_iteration() > 0)
-        subDomain()->timeLoopMng()->stopComputeLoop(true);
-    } else {
-      // Stop the computation loop if the maximum time is reached
-      if (t >= tmax)
-        subDomain()->timeLoopMng()->stopComputeLoop(true);
-    }
+  // Stop the computation loop if the maximum time is reached
+  if (t >= tmax)
+    subDomain()->timeLoopMng()->stopComputeLoop(true);
 
   info() << "[ArcaneFem-Info] Time iteration at t : " << t << " (s) ";
   bool keep_struct = true;
@@ -234,12 +228,8 @@ _doStationarySolve()
       _solveNewton();
 
   if(m_cross_validation)
-    if (m_constitutive_law == "Hooke") {
+   if (t > 0. && t==tmax) {
       _validateResults();
-    }else {
-      if (t > 0. && t==tmax) {
-        _validateResults();
-      }
     }
 }
 
@@ -275,21 +265,7 @@ _solveNewton()
   m_newton_iter = 0;
 
   if (m_constitutive_law == "VonMises") {
-    // --- restore_converged_state ---- //
-    ENUMERATE_ (Cell, icell, allCells())
-    {
-      Cell cell = *icell;
-
-      for (Int8 iGP = 0; iGP < m_nGP; ++iGP ) {
-        m_sigma_2d_gp(cell, iGP, 0) = m_sigma_old_2d_gp(cell, iGP, 0);
-        m_sigma_2d_gp(cell, iGP, 1) = m_sigma_old_2d_gp(cell, iGP, 1);
-        m_sigma_2d_gp(cell, iGP, 2) = m_sigma_old_2d_gp(cell, iGP, 2);
-      }
-
-      for (Int8 ix = 0; ix < 3; ++ix)
-        for (Int8 iy = 0; iy < 3; ++iy)
-          m_C_tang_2d_cell(cell, ix, iy) = m_C_2d(ix, iy); // set tangent C equal to elastic C
-    }
+    _restoreConvergedStateVonMises();
   }
 
   // --- assemble_linear_system ---- //
@@ -319,84 +295,7 @@ _solveNewton()
     _incrementVariables();
 
     if (m_constitutive_law == "VonMises") {
-      ENUMERATE_ (Cell, icell, allCells())
-      {
-        Cell cell = *icell;
-
-        for (Int8 iGP = 0; iGP < m_nGP; ++iGP ) {
-
-          // --- compute_trial_state ---- //
-          // computeTrialStateVM();
-          // epsilon(DU) // NOTE: for nGP>1 it has to evaluated and interpolated at Gauss points
-          Real3x3 grad_DU = ArcaneFemFunctions::FeOperation2D::FeOperation2D::computeGradientTria3(cell, m_node_coord, m_DU);
-          Real eps_xx = grad_DU(0, 0);
-          Real eps_yy = grad_DU(1, 1);
-          Real eps_xy = M_SQRT1_2 * (grad_DU(0, 1) + grad_DU(1, 0));
-
-          Real sigma_trial_xx = m_sigma_old_2d_gp(cell, iGP, 0) + m_C_2d(0, 0) * eps_xx + m_C_2d(0, 1) * eps_yy + m_C_2d(0, 2) * eps_xy;
-          Real sigma_trial_yy = m_sigma_old_2d_gp(cell, iGP, 1) + m_C_2d(1, 0) * eps_xx + m_C_2d(1, 1) * eps_yy + m_C_2d(1, 2) * eps_xy;
-          Real sigma_trial_xy = m_sigma_old_2d_gp(cell, iGP, 2) + m_C_2d(2, 0) * eps_xx + m_C_2d(2, 1) * eps_yy + m_C_2d(2, 2) * eps_xy;
-
-          Real sigma_trial_zz = m_sigma_zz_old_2d_gp(cell, iGP) + lambda * (eps_xx + eps_yy);
-
-          // Plane strain retains sigma_zz in the three-dimensional deviator.
-          Real sigma_trial_mean = (sigma_trial_xx + sigma_trial_yy + sigma_trial_zz) / 3.0;
-
-          Real dev_xx = sigma_trial_xx - sigma_trial_mean;
-          Real dev_yy = sigma_trial_yy - sigma_trial_mean;
-          Real dev_xy = sigma_trial_xy;
-
-          Real dev_zz = sigma_trial_zz - sigma_trial_mean;
-
-          Real sigma_eq_trial = math::sqrt(1.5 * (dev_xx * dev_xx + dev_yy * dev_yy + dev_zz * dev_zz + dev_xy * dev_xy) );
-
-          // --- evaluate_yield_function ---- //
-          // _computeYieldFunctionVM();
-          Real yield_function = sigma_eq_trial - sig0 - H * m_p_old_2d_gp(cell, iGP);
-          Real yield_positive = (yield_function + math::abs(yield_function)) / 2.;
-          m_dp_2d_gp(cell, iGP) = yield_positive/ (3. * mu + H);
-          Real plastic_switch = yield_positive / (math::abs(yield_function) + 1e-14 * sig0);
-
-          // --- radial_return_update ---- //
-          // _computeRadialReturnVM();
-          Real flowN_xx = plastic_switch * dev_xx / (sigma_eq_trial + 1e-14 * sig0);
-          Real flowN_yy = plastic_switch * dev_yy / (sigma_eq_trial + 1e-14 * sig0);
-          Real flowN_xy = plastic_switch * dev_xy / (sigma_eq_trial + 1e-14 * sig0);
-          Real flowN_zz = plastic_switch * dev_zz / (sigma_eq_trial + 1e-14 * sig0);
-
-          Real beta = 3. * mu * m_dp_2d_gp(cell, iGP) / (sigma_eq_trial + 1e-14 * sig0);
-
-          // --- update_consistent_tangent ---- //
-          // _updateStressTensorVM();
-          Real sigma_xx = sigma_trial_xx - dev_xx * beta;
-          Real sigma_yy = sigma_trial_yy - dev_yy * beta;
-          Real sigma_xy = sigma_trial_xy - dev_xy * beta;
-
-          Real sigma_zz = sigma_trial_zz - dev_zz * beta;
-
-          m_sigma_2d_gp(cell, iGP, 0) = sigma_xx;
-          m_sigma_2d_gp(cell, iGP, 1) = sigma_yy;
-          m_sigma_2d_gp(cell, iGP, 2) = sigma_xy;
-
-          m_sigma_zz_2d_gp(cell, iGP) = sigma_zz;
-
-          // _updateTangentMaterialTensorVM();
-          Real tangentA = 3.* mu * (3. * mu / (3. * mu + H) - beta);
-
-          m_C_tang_2d_cell(cell, 0, 0) = m_C_2d(0, 0) - tangentA * flowN_xx * flowN_xx - 4. * mu * beta / 3.;
-          m_C_tang_2d_cell(cell, 0, 1) = m_C_2d(0, 1) - tangentA * flowN_xx * flowN_yy + 2. * mu * beta / 3.;
-          m_C_tang_2d_cell(cell, 0, 2) = m_C_2d(0, 2) - tangentA * flowN_xx * flowN_xy;
-
-          m_C_tang_2d_cell(cell, 1, 0) = m_C_2d(1, 0) - tangentA * flowN_xx * flowN_yy + 2. * mu * beta / 3.;
-          m_C_tang_2d_cell(cell, 1, 1) = m_C_2d(1, 1) - tangentA * flowN_yy * flowN_yy - 4. * mu * beta / 3.;
-          m_C_tang_2d_cell(cell, 1, 2) = m_C_2d(1, 2) - tangentA * flowN_yy * flowN_xy;
-
-          m_C_tang_2d_cell(cell, 2, 0) = m_C_2d(2, 0) - tangentA * flowN_xx * flowN_xy;
-          m_C_tang_2d_cell(cell, 2, 1) = m_C_2d(2, 1) - tangentA * flowN_yy * flowN_xy;
-          m_C_tang_2d_cell(cell, 2, 2) = m_C_2d(2, 2) - tangentA * flowN_xy * flowN_xy - 2. * mu * beta;
-
-        }
-      }
+      _updateGlobalTangentMaterialTensorVonMises();
     }
 
     // --- assemble_linear_system ---- //
@@ -479,56 +378,33 @@ _getMaterialParameters()
   info() << "[ArcaneFem-Info] Started module  _getMaterialParameters()";
   Real elapsedTime = platform::getRealTime();
 
-  mu = (E / (2 * (1 + nu))); // lame parameter μ
-  lambda = E * nu / ((1 + nu) * (1 - 2 * nu)); // lame parameter λ
+  if (m_material_initialized)
+    return;
 
-  // Elastic material tensors
-  /*
- {{lambda + 2. * mu, lambda,           0.},
-  {lambda,           lambda + 2. * mu, 0.},
-  {0.,               0.,               2 * mu}}
-*/ // 2D elastic material tensor
+  if (m_constitutive_law == "VonMises") {
+    mu = (E / (2 * (1 + nu))); // lame parameter μ
+    lambda = E * nu / ((1 + nu) * (1 - 2 * nu)); // lame parameter λ
 
-  /*
-   {{lambda + 2.*mu, lambda,         lambda,         0.,  0.,  0.},
-    {lambda,         lambda + 2.*mu, lambda,         0.,  0.,  0.},
-    {lambda,         lambda,         lambda + 2.*mu, 0.,  0.,  0.},
-    {0.,             0.,             0.,             2mu,  0.,  0.},
-    {0.,             0.,             0.,             0.,  2mu,  0.},
-    {0.,             0.,             0.,             0.,  0.,  2mu}}
-  */ // 3D elastic material tensor
-
-  if (mesh()->dimension() == 2) {
-    m_C_2d.fill(0.);
-    m_C_2d(0, 0) = lambda + 2. * mu;
-    m_C_2d(1, 1) = lambda + 2. * mu;
-    m_C_2d(2, 2) = 2. * mu;
-    m_C_2d(0, 1) = lambda;
-    m_C_2d(1, 0) = lambda;
-  } else {
-    m_C_3d.fill(0.);
-    m_C_3d(0, 0) = lambda + 2. * mu;
-    m_C_3d(1, 1) = lambda + 2. * mu;
-    m_C_3d(2, 2) = lambda + 2. * mu;
-    m_C_3d(3, 3) = 2 * mu;
-    m_C_3d(4, 4) = 2 * mu;
-    m_C_3d(5, 5) = 2 * mu;
-    m_C_3d(0, 1) = lambda;
-    m_C_3d(1, 0) = lambda;
-    m_C_3d(0, 2) = lambda;
-    m_C_3d(2, 0) = lambda;
-    m_C_3d(1, 2) = lambda;
-    m_C_3d(2, 1) = lambda;
-  }
-
-  if (m_constitutive_law == "VonMises") { // set von Mises params
     Et = E / 100.;
     H = E * Et / (E - Et);
 
-    // Constitutive history is initialized once. Calling this routine at the
-    // next load step must not erase the converged stress and plastic strain.
-    if (!m_material_initialized && mesh()->dimension() == 2) {
-      ENUMERATE_ (Cell, icell, allCells())
+    if (mesh()->dimension() == 2) {
+
+      // Initialize elastic part of the material tensor
+      /*
+        lambda + 2mu  lambda         0
+        lambda        lambda + 2mu   0
+          0             0           2mu
+      */
+      m_C_2d.fill(0.);
+      m_C_2d(0, 0) = lambda + 2. * mu;
+      m_C_2d(1, 1) = lambda + 2. * mu;
+      m_C_2d(2, 2) = 2. * mu;
+      m_C_2d(0, 1) = lambda;
+      m_C_2d(1, 0) = lambda;
+
+      // Initialize constitutive history
+      ENUMERATE_ (Cell, icell, allCells()) // TODO check if MDMeshVars provide initialisation method
       {
         for (Int8 iGP = 0; iGP < m_nGP; ++iGP ) {
           m_sigma_2d_gp(icell, iGP, 0) = 0.;
@@ -545,31 +421,54 @@ _getMaterialParameters()
           m_dp_2d_gp(icell, iGP) = 0.;
         }
       }
-    } else if (mesh()->dimension() != 2) {
-      ARCANE_FATAL("Not implemented yet");
-    }
-  }
 
-  if (m_gp_material_tensor_strategy == "local") {
-     if (mesh()->dimension() == 2) {
-       m_C_tang_2d = m_C_2d;
-     } else {
-       m_C_tang_3d = m_C_3d;
-     }
-  } else {
-    if (mesh()->dimension() == 2) {
-      ENUMERATE_ (Cell, icell, allCells()) {
-        for (Int8 ix = 0; ix < 3; ++ix) {
-          for (Int8 iy = 0; iy < 3; ++iy) {
-            m_C_tang_2d_cell(icell, ix, iy) = m_C_2d(ix, iy);
+      // Initialize the tangent material tensor
+      if (m_gp_material_tensor_strategy == "local") {
+        m_C_tang_2d = m_C_2d;
+      } else {
+        ENUMERATE_ (Cell, icell, allCells()) {
+          for (Int8 ix = 0; ix < 3; ++ix) {
+            for (Int8 iy = 0; iy < 3; ++iy) {
+              m_C_tang_2d_cell(icell, ix, iy) = m_C_2d(ix, iy);
+            }
           }
         }
       }
     } else {
-      ENUMERATE_ (Cell, icell, allCells()) {
-        for (Int8 ix = 0; ix < 6; ++ix) {
-          for (Int8 iy = 0; iy < 6; ++iy) {
-            m_C_tang_3d_cell(icell,ix, iy) = m_C_3d(ix, iy);
+      ARCANE_FATAL("Not implemented for 3D yet");
+
+      // Initialize elastic part of the material tensor
+        /*
+          lambda+2mu  lambda     lambda     0    0    0
+          lambda      lambda+2mu lambda     0    0    0
+          lambda      lambda     lambda+2mu 0    0    0
+          0           0          0          2mu  0    0
+          0           0          0          0    2mu  0
+          0           0          0          0    0    2mu
+      */
+      m_C_3d.fill(0.);
+      m_C_3d(0, 0) = lambda + 2. * mu;
+      m_C_3d(1, 1) = lambda + 2. * mu;
+      m_C_3d(2, 2) = lambda + 2. * mu;
+      m_C_3d(3, 3) = 2 * mu;
+      m_C_3d(4, 4) = 2 * mu;
+      m_C_3d(5, 5) = 2 * mu;
+      m_C_3d(0, 1) = lambda;
+      m_C_3d(1, 0) = lambda;
+      m_C_3d(0, 2) = lambda;
+      m_C_3d(2, 0) = lambda;
+      m_C_3d(1, 2) = lambda;
+      m_C_3d(2, 1) = lambda;
+
+      // Initialize the tangent material tensor
+      if (m_gp_material_tensor_strategy == "local") {
+        m_C_tang_3d = m_C_3d;
+      } else {
+        ENUMERATE_ (Cell, icell, allCells()) {
+          for (Int8 ix = 0; ix < 6; ++ix) {
+            for (Int8 iy = 0; iy < 6; ++iy) {
+              m_C_tang_3d_cell(icell,ix, iy) = m_C_3d(ix, iy);
+            }
           }
         }
       }
@@ -613,11 +512,9 @@ _assembleLinearOperator()
 
   if (m_constitutive_law == "VonMises") {
     _applyInternalBodyForceVonMises(rhs_values, node_dof);
-    _applyDirichletNewton(rhs_values, node_dof);
-   } else {
-    _applyInternalBodyForceHooke(rhs_values, node_dof);
-    _applyDirichletNewton(rhs_values, node_dof);
   }
+
+  _applyDirichletNewton(rhs_values, node_dof);
 
   elapsedTime = platform::getRealTime() - elapsedTime;
   ArcaneFemFunctions::GeneralFunctions::printArcaneFemTime(traceMng(),"rhs-vector-assembly", elapsedTime);
@@ -652,7 +549,7 @@ _assembleBilinearOperator()
     m_bsr_format.computeSparsity();
     if (mesh()->dimension() == 2) {
       if (m_gp_material_tensor_strategy == "local") {
-        m_bsr_format.assembleBilinearAtomic([=] ARCCORE_HOST_DEVICE(CellLocalId cell_lid) { return computeHookeElementMatrixTria3Gpu(cell_lid, cn_cv, in_node_coord, hooke_params); });
+        ARCANE_FATAL("local GP element matrix assembly strategy not implemented for Tria3 elements");
       } else {
         m_bsr_format.assembleBilinearAtomic([=] ARCCORE_HOST_DEVICE(CellLocalId cell_lid) { return computeElementMatrixTria3Gpu(cell_lid, cn_cv, in_node_coord, in_C_tang_2d); });
       }
@@ -677,7 +574,7 @@ _assembleBilinearOperator()
     m_bsr_format.computeSparsity();
     if (mesh()->dimension() == 2) {
       if (m_gp_material_tensor_strategy == "local") {
-        m_bsr_format.assembleBilinearAtomicFree([=] ARCCORE_HOST_DEVICE(CellLocalId cell_lid, Int32 node_lid) { return computeHookeElementVectorTria3Gpu(cell_lid, cn_cv, in_node_coord, hooke_params, node_lid); });
+        ARCANE_FATAL("local GP element vector assembly strategy not implemented for Tria3 elements");
       } else {
         m_bsr_format.assembleBilinearAtomicFree([=] ARCCORE_HOST_DEVICE(CellLocalId cell_lid, Int32 node_lid) { return computeElementVectorTria3Gpu(cell_lid, cn_cv, in_node_coord, in_C_tang_2d, node_lid); });
       }
