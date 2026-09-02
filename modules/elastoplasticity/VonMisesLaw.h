@@ -98,7 +98,7 @@ inline void FemModuleElastoplasticity::_updateGlobalTangentMaterialTensorVonMise
       // --- compute_trial_state ---- //
       // computeTrialStateVM();
       // epsilon(DU) // NOTE: for nGP>1 it has to evaluated and interpolated at Gauss points
-      Real3x3 grad_DU = ArcaneFemFunctions::FeOperation2D::FeOperation2D::computeGradientTria3(cell, m_node_coord, m_DU);
+      Real3x3 grad_DU = ArcaneFemFunctions::FeOperation2D::FeOperation2D::computeGradientTria3(cell, m_node_coord, m_DUn);
       Real eps_xx = grad_DU(0, 0);
       Real eps_yy = grad_DU(1, 1);
       Real eps_xy = M_SQRT1_2 * (grad_DU(0, 1) + grad_DU(1, 0));

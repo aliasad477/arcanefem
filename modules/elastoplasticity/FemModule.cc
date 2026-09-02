@@ -260,8 +260,8 @@ _solveNewton()
   _getMaterialParameters();
 
   // --- initialize_increment ---- //
-  m_DU.fill({0., 0., 0.});
-  m_dU.fill({0., 0., 0.});
+  m_DUn.fill({0., 0., 0.});
+  m_DUk.fill({0., 0., 0.});
   m_newton_iter = 0;
 
   if (m_constitutive_law == "VonMises") {
@@ -277,7 +277,7 @@ _solveNewton()
   // --- calculate_residual ---- //
   VariableDoFReal& residual_values(m_linear_system.rhsVariable());
   auto node_dof(m_dofs_on_nodes.nodeDoFConnectivityView());
-  m_residual_norm0 = _norm_l2(residual_values, node_dof);
+  m_residual_norm0 = _normL2(residual_values, node_dof);
   info() << "[ArcaneFem-Info] Initial residual norm = " << m_residual_norm0;
 
 
@@ -307,7 +307,7 @@ _solveNewton()
           m_bsr_format.resetMatrixValues();
 
         _assembleBilinearOperator(); // assembles Jacobian
-        _assembleLinearOperator(); // assembles Residuals(m_DU) + BCs
+        _assembleLinearOperator(); // assembles Residuals(m_DUn) + BCs
       }
     }
 
@@ -341,9 +341,9 @@ _solveNewton()
   // TODO Move to stationary solve
   // --- commit_displacements ---- //
   m_U.synchronize();
-  m_DU.synchronize();
+  m_DUn.synchronize();
   ENUMERATE_ (Node, inode, ownNodes()) {
-    m_U[inode] += m_DU[inode];
+    m_U[inode] += m_DUn[inode];
   }
   m_U.synchronize();
 
@@ -681,14 +681,14 @@ _validateResults()
 
   ENUMERATE_ (Node, inode, allNodes()) {
     Node node = *inode;
-    info() << "U["<< node.uniqueId() << "] = " << m_DU[node].x << " " << m_DU[node].y << " " << m_DU[node].z;
+    info() << "U["<< node.uniqueId() << "] = " << m_DUn[node].x << " " << m_DUn[node].y << " " << m_DUn[node].z;
   }
 
   String filename = options()->solutionComparisonFile();
   const double epsilon = options()->resultEpsilon();
   const double min_value_to_test = 1.0e-10;
 
-  Arcane::FemUtils::checkNodeResultFile(traceMng(), filename, m_DU, epsilon, min_value_to_test);
+  Arcane::FemUtils::checkNodeResultFile(traceMng(), filename, m_DUn, epsilon, min_value_to_test);
 
   elapsedTime = platform::getRealTime() - elapsedTime;
   ArcaneFemFunctions::GeneralFunctions::printArcaneFemTime(traceMng(),"result-validation", elapsedTime);
@@ -746,18 +746,18 @@ _updateVariables()
         Real u1_val = dof_u[node_dof.dofId(node, 0)];
         Real u2_val = dof_u[node_dof.dofId(node, 1)];
         Real u3_val = dof_u[node_dof.dofId(node, 2)];
-        m_DU[node] = Real3(u1_val, u2_val, u3_val);
+        m_DUn[node] = Real3(u1_val, u2_val, u3_val);
       }
     else
       ENUMERATE_ (Node, inode, ownNodes()) {
         Node node = *inode;
         Real u1_val = dof_u[node_dof.dofId(node, 0)];
         Real u2_val = dof_u[node_dof.dofId(node, 1)];
-        m_DU[node] = Real3(u1_val, u2_val, 0.);
+        m_DUn[node] = Real3(u1_val, u2_val, 0.);
       }
   }
 
-  m_DU.synchronize();
+  m_DUn.synchronize();
 
   elapsedTime = platform::getRealTime() - elapsedTime;
   ArcaneFemFunctions::GeneralFunctions::printArcaneFemTime(traceMng(),"update-variables", elapsedTime);
@@ -789,17 +789,17 @@ _updateNewtonIncrements()
         Real du1_val = dof_du[node_dof.dofId(node, 0)];
         Real du2_val = dof_du[node_dof.dofId(node, 1)];
         Real du3_val = dof_du[node_dof.dofId(node, 2)];
-        m_dU[node] = Real3(du1_val, du2_val, du3_val);
+        m_DUk[node] = Real3(du1_val, du2_val, du3_val);
       }
     else
       ENUMERATE_ (Node, inode, ownNodes()) {
         Node node = *inode;
         Real du1_val = dof_du[node_dof.dofId(node, 0)];
         Real du2_val = dof_du[node_dof.dofId(node, 1)];
-        m_dU[node] = Real3(du1_val, du2_val, 0.);
+        m_DUk[node] = Real3(du1_val, du2_val, 0.);
       }
   }
-  m_dU.synchronize();
+  m_DUk.synchronize();
 
   elapsedTime = platform::getRealTime() - elapsedTime;
   ArcaneFemFunctions::GeneralFunctions::printArcaneFemTime(traceMng(),"update-Newton-increments", elapsedTime);
@@ -822,7 +822,7 @@ _updateGuessFromIncrement()
   info() << "[ArcaneFem-Info] Started module _updateGuessFromIncrement()";
   Real elapsedTime = platform::getRealTime();
 
-  m_dU.synchronize();
+  m_DUk.synchronize();
 
   {
     VariableDoFReal& dof_du(m_linear_system.solutionVariable());
@@ -830,15 +830,15 @@ _updateGuessFromIncrement()
     if (mesh()->dimension() == 3)
       ENUMERATE_ (Node, inode, ownNodes()) {
       Node node = *inode;
-      dof_du[node_dof.dofId(node, 0)] = m_dU[node][0];
-      dof_du[node_dof.dofId(node, 1)] = m_dU[node][1];
-      dof_du[node_dof.dofId(node, 2)] = m_dU[node][2];
+      dof_du[node_dof.dofId(node, 0)] = m_DUk[node][0];
+      dof_du[node_dof.dofId(node, 1)] = m_DUk[node][1];
+      dof_du[node_dof.dofId(node, 2)] = m_DUk[node][2];
     }
     else
       ENUMERATE_ (Node, inode, ownNodes()) {
       Node node = *inode;
-      dof_du[node_dof.dofId(node, 0)] = m_dU[node][0];
-      dof_du[node_dof.dofId(node, 1)] = m_dU[node][1];
+      dof_du[node_dof.dofId(node, 0)] = m_DUk[node][0];
+      dof_du[node_dof.dofId(node, 1)] = m_DUk[node][1];
     }
   }
 
@@ -864,14 +864,14 @@ _incrementVariables()
   info() << "[ArcaneFem-Info] Started module _incrementVariables()";
   Real elapsedTime = platform::getRealTime();
 
-  m_dU.synchronize();
-  m_DU.synchronize();
+  m_DUk.synchronize();
+  m_DUn.synchronize();
   {
       ENUMERATE_ (Node, inode, ownNodes()) {
-      m_DU[inode] += m_dU[inode];
+      m_DUn[inode] += m_DUk[inode];
     }
   }
-  m_DU.synchronize();
+  m_DUn.synchronize();
 
   elapsedTime = platform::getRealTime() - elapsedTime;
   ArcaneFemFunctions::GeneralFunctions::printArcaneFemTime(traceMng(), "increment-fem-variables", elapsedTime);
@@ -893,11 +893,11 @@ _checkNewtonConvergence()
   info() << "[ArcaneFem-Info] Started module _checkNewtonConvergence()";
   Real elapsedTime = platform::getRealTime();
 
-  m_dU.synchronize();
-  m_DU.synchronize();
+  m_DUk.synchronize();
+  m_DUn.synchronize();
 
-  Real l2_norm_du = _norm_l2(m_dU);
-  Real l2_norm_u = _norm_l2(m_DU);
+  Real l2_norm_du = _normL2(m_DUk);
+  Real l2_norm_u = _normL2(m_DUn);
 
   m_increment_norm = l2_norm_u != 0.0 ? l2_norm_du / l2_norm_u : 1.0;
   Real convergence_error_increment = l2_norm_du / (m_newton_rtol * l2_norm_u  + m_newton_atol);
@@ -906,7 +906,7 @@ _checkNewtonConvergence()
   auto node_dof(m_dofs_on_nodes.nodeDoFConnectivityView());
   _applyDirichlet0(residual_values, node_dof);
 
-  Real l2_norm_rhs = _norm_l2(residual_values, node_dof);
+  Real l2_norm_rhs = _normL2(residual_values, node_dof);
 
   m_residual_norm = l2_norm_rhs!=0 ? l2_norm_rhs / m_residual_norm0 : 1.0;
   Real convergence_error_residual = l2_norm_rhs / (m_residual_norm0 + 1e-30);
@@ -939,7 +939,7 @@ _checkNewtonConvergence()
 }
 
 inline Real FemModuleElastoplasticity::
-_norm_l2(VariableNodeReal3& u) {
+_normL2(VariableNodeReal3& u) {
   Real l2_norm_u = 0.0;
   {
     ENUMERATE_ (Node, inode, ownNodes()) {
@@ -954,12 +954,13 @@ _norm_l2(VariableNodeReal3& u) {
 }
 
 inline Real FemModuleElastoplasticity::
-_norm_l2(VariableDoFReal& u, const IndexedNodeDoFConnectivityView& node_dof) {
+_normL2(VariableDoFReal& u, const IndexedNodeDoFConnectivityView& node_dof) {
   Real l2_norm_u = 0.0;
+  Int32 mesh_dimension = mesh()->dimension();
   {
     ENUMERATE_ (Node, inode, ownNodes()) {
       Real norm_residual = 0.0;
-      if (mesh()->dimension() == 2) {
+      if (mesh_dimension == 2) {
         norm_residual =  math::pow(u[node_dof.dofId(inode, 0)], 2.0)
                   + math::pow(u[node_dof.dofId(inode, 1)], 2.0);
       } else {

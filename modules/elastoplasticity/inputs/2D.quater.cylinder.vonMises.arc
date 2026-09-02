@@ -9,7 +9,6 @@
    <output-period>1</output-period>
    <output>
      <variable>U</variable>
-     <variable>DU</variable>
    </output>
   </arcane-post-processing>
 

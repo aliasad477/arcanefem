@@ -174,8 +174,8 @@ class FemModuleElastoplasticity
   inline void _applyDirichlet0(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
 
 
-  inline Real _norm_l2(VariableNodeReal3& u);
-  inline Real _norm_l2(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
+  inline Real _normL2(VariableNodeReal3& u);
+  inline Real _normL2(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
 
   RealMatrix<6, 6> _computeElementMatrixTria3(Cell cell);
   RealMatrix<12, 12> _computeElementMatrixTetra4(Cell cell);
