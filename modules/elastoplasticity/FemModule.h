@@ -86,7 +86,7 @@ class FemModuleElastoplasticity
   void _assembleDirichletsNewtonGpu();
   void _assembleDirichlets0Gpu();
 
-  inline void _applyInternalBodyForceTria3Gpu(VariableDoFReal& rhs_values, const FemDoFsOnNodes& dofs_on_nodes, const VariableNodeReal3& node_coord, IMesh* mesh, RunQueue* queue);
+  inline void _applyInternalBodyForceHookeTria3Gpu(VariableDoFReal& rhs_values, const FemDoFsOnNodes& dofs_on_nodes, const VariableNodeReal3& node_coord, IMesh* mesh, RunQueue* queue);
   inline void _applyInternalBodyForceVonMisesTria3Gpu(VariableDoFReal& rhs_values, const FemDoFsOnNodes& dofs_on_nodes, const VariableNodeReal3& node_coord, IMesh* mesh, RunQueue* queue);
 
  private:
@@ -128,6 +128,7 @@ class FemModuleElastoplasticity
 
   String m_petsc_flags;
   String m_matrix_format = "DOK";
+  String m_constitutive_law = "VonMises";
   String m_gp_material_tensor_strategy = "local";
   String m_newton_converged_reason = "";
 
@@ -139,14 +140,12 @@ class FemModuleElastoplasticity
   bool m_cross_validation = false;
   bool m_hex_quad_mesh = false;
 
-  bool m_nonlinear_law = false;
   bool m_material_initialized = false;
   bool m_newton_solver_converged = false;
   bool m_check_with_bilinear_operator = false;
 
   void _updateTime();
   void _getMaterialParameters();
-  void _solveLinear();
   void _solveNewton();
   void _checkNewtonConvergence();
   void _incrementVariables();
@@ -169,11 +168,11 @@ class FemModuleElastoplasticity
   inline void _applyDirichletNewton(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
   inline void _applyDirichlet0(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
 
-  inline void _applyInternalBodyForce(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
-  inline void _applyInternalBodyForceTria3Cpu(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
-  inline void _applyInternalBodyForceQuad4(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
-  inline void _applyInternalBodyForceTetra4(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
-  inline void _applyInternalBodyForceHexa8(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
+  inline void _applyInternalBodyForceHooke(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
+  inline void _applyInternalBodyForceHookeTria3Cpu(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
+  inline void _applyInternalBodyForceHookeQuad4(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
+  inline void _applyInternalBodyForceHookeTetra4(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
+  inline void _applyInternalBodyForceHookeHexa8(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
 
   inline void _applyInternalBodyForceVonMises(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
   inline void _applyInternalBodyForceVonMisesTria3Cpu(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);

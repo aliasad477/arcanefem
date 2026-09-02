@@ -100,6 +100,10 @@
       <description>Boolean to enable linear system solving.</description>
     </simple>
 
+    <simple name="solve-nonlinear-system" type="bool" default="true" optional="true">
+      <description>Boolean to enable nonlinear system solving.</description>
+    </simple>
+
     <simple name="assemble-linear-system" type="bool" default="true" optional="true">
       <description>Boolean to enable linear system assembly.</description>
     </simple>
@@ -108,10 +112,12 @@
       <description>Boolean to use hexagonal quadrature for element matrix assembly.</description>
     </simple>
 
-    <!-- - - - - - nonlinear-analysis-parameters - - - - -->
-    <simple name="nonlinear-law" type="bool" default="false" optional="true">
-      <description>Boolean to enable solving as nonlinear problem</description>
+    <!-- - - - - - constitutive law for plasticity/elasticity - - - - -->
+    <simple name="constitutive-law" type="string" default="VonMises" optional="true">
+      <description>Which constitutive law to use VonMises|Hooke.</description>
     </simple>
+
+    <!-- - - - - - nonlinear-analysis-parameters - - - - -->
     <simple name="check-bilinear-operator-for-residual" type="bool" default="false" optional="true">
       <description>Boolean to enable verification of RHS residual with that evaluated using the bilinear operator</description>
     </simple>

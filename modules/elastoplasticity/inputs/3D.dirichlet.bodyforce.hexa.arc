@@ -8,7 +8,7 @@
   <arcane-post-processing>
    <output-period>1</output-period>
    <output>
-     <variable>U</variable>
+     <variable>DU</variable>
    </output>
   </arcane-post-processing>
 
@@ -22,6 +22,8 @@
   </meshes>
 
   <fem>
+    <constitutive-law>Hooke</constitutive-law>
+   <newton-max-iters>1</newton-max-iters>
     <hex-quad-mesh>true</hex-quad-mesh>
     <E>200e9</E>
     <nu>0.3</nu>

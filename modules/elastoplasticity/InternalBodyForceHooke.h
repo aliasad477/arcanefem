@@ -5,16 +5,17 @@
 // SPDX-License-Identifier: Apache-2.0
 //-----------------------------------------------------------------------------
 /*---------------------------------------------------------------------------*/
-/* InternalBodyForceRHS.h                                                (C) 2000-2026 */
+/* InternalBodyForceHooke.h                                    (C) 2000-2026 */
 /*                                                                           */
 /* Contains functions to compute and assemble source term contribution to RHS*/
+/* corresponding to the internal force term for Hooke's elasticity law       */
 /*---------------------------------------------------------------------------*/
 /*---------------------------------------------------------------------------*/
 
 /*---------------------------------------------------------------------------*/
 /**
  * @brief Applies nonlinear internal body force term to RHS vector of
- * the linear system.
+ * the linear system for Hooke's elasticity law.
  * 
  * @param rhs_values The variable representing the RHS vector to be updated.
  * @param node_dof The connectivity view mapping nodes to their corresponding
@@ -22,7 +23,7 @@
 /*---------------------------------------------------------------------------*/
 
 inline void FemModuleElastoplasticity::
-_applyInternalBodyForce(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof)
+_applyInternalBodyForceHooke(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof)
 {
   auto use_gpu = options()->linearSystem.serviceName() == "HypreLinearSystem" ||
     options()->linearSystem.serviceName() == "PetscLinearSystem";
@@ -32,29 +33,29 @@ _applyInternalBodyForce(VariableDoFReal& rhs_values, const IndexedNodeDoFConnect
     auto mesh_ptr = mesh();
     if (mesh()->dimension() == 2) {
       if (m_hex_quad_mesh) {
-        _applyInternalBodyForceQuad4(rhs_values, node_dof);
+        _applyInternalBodyForceHookeQuad4(rhs_values, node_dof);
       } else {
-        _applyInternalBodyForceTria3Gpu(rhs_values, m_dofs_on_nodes, m_node_coord, mesh_ptr, queue);
+        _applyInternalBodyForceHookeTria3Gpu(rhs_values, m_dofs_on_nodes, m_node_coord, mesh_ptr, queue);
       }
     } else {
       if (m_hex_quad_mesh) {
-        _applyInternalBodyForceHexa8(rhs_values, node_dof);
+        _applyInternalBodyForceHookeHexa8(rhs_values, node_dof);
       } else {
-        _applyInternalBodyForceTetra4(rhs_values, node_dof);
+        _applyInternalBodyForceHookeTetra4(rhs_values, node_dof);
       }
     }
   } else {
     if (mesh()->dimension() == 2) {
       if (m_hex_quad_mesh) {
-        _applyInternalBodyForceQuad4(rhs_values, node_dof);
+        _applyInternalBodyForceHookeQuad4(rhs_values, node_dof);
       } else {
-        _applyInternalBodyForceTria3Cpu(rhs_values, node_dof);
+        _applyInternalBodyForceHookeTria3Cpu(rhs_values, node_dof);
       }
     } else {
       if (m_hex_quad_mesh) {
-        _applyInternalBodyForceHexa8(rhs_values, node_dof);
+        _applyInternalBodyForceHookeHexa8(rhs_values, node_dof);
       } else {
-        _applyInternalBodyForceTetra4(rhs_values, node_dof);
+        _applyInternalBodyForceHookeTetra4(rhs_values, node_dof);
       }
     }
   }
@@ -137,12 +138,12 @@ computeInternalBodyForceTria3Base(Real3 dxu,
 }
 
 inline void FemModuleElastoplasticity::
-_applyInternalBodyForceTria3Gpu(VariableDoFReal& rhs_values,
+_applyInternalBodyForceHookeTria3Gpu(VariableDoFReal& rhs_values,
                           const FemDoFsOnNodes& dofs_on_nodes,
                           const VariableNodeReal3& node_coord,
                           IMesh* mesh, RunQueue* queue)
 {
-  info() << "[ArcaneFem-Info] Started module  _applyInternalBodyForceTria3Gpu()";
+  info() << "[ArcaneFem-Info] Started module  _applyInternalBodyForceHookeTria3Gpu()";
   ARCANE_CHECK_PTR(queue);
   ARCANE_CHECK_PTR(mesh);
 
@@ -222,9 +223,9 @@ _applyInternalBodyForceTria3Gpu(VariableDoFReal& rhs_values,
 }
 
 inline void FemModuleElastoplasticity::
-_applyInternalBodyForceTria3Cpu(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof)
+_applyInternalBodyForceHookeTria3Cpu(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof)
 {
-  info() << "[ArcaneFem-Info] Started module  _applyInternalBodyForceTria3Cpu()";
+  info() << "[ArcaneFem-Info] Started module  _applyInternalBodyForceHookeTria3Cpu()";
 
   ENUMERATE_ (Cell, icell, allCells()) {
     Cell cell = *icell;
@@ -270,7 +271,7 @@ _applyInternalBodyForceTria3Cpu(VariableDoFReal& rhs_values, const IndexedNodeDo
 
 
 void FemModuleElastoplasticity::
-_applyInternalBodyForceQuad4(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof)
+_applyInternalBodyForceHookeQuad4(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof)
 {
   ENUMERATE_ (Cell, icell, allCells()) {
     Cell cell = *icell;
@@ -372,7 +373,7 @@ _applyInternalBodyForceQuad4(VariableDoFReal& rhs_values, const IndexedNodeDoFCo
 }
 
 inline void FemModuleElastoplasticity::
-_applyInternalBodyForceTetra4(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof)
+_applyInternalBodyForceHookeTetra4(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof)
 {
   ENUMERATE_ (Cell, icell, allCells())
   {
@@ -521,7 +522,7 @@ _applyInternalBodyForceTetra4(VariableDoFReal& rhs_values, const IndexedNodeDoFC
 }
 
 void FemModuleElastoplasticity::
-_applyInternalBodyForceHexa8(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof)
+_applyInternalBodyForceHookeHexa8(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof)
 {
   ENUMERATE_ (Cell, icell, allCells()) {
     Cell cell = *icell;

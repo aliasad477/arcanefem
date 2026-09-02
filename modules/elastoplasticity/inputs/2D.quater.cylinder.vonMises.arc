@@ -22,7 +22,7 @@
   <fem>
     <tmax>21.</tmax>
     <dt>1.</dt>
-    <nonlinear-law>true</nonlinear-law>
+    <constitutive-law>VonMises</constitutive-law>
     <gp-material-tensor-strategy>global</gp-material-tensor-strategy>
     <E>70.0e3</E>
     <nu>0.3</nu>

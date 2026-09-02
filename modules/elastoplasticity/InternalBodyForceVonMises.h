@@ -5,7 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //-----------------------------------------------------------------------------
 /*---------------------------------------------------------------------------*/
-/* InternalBodyForceRHSVonMises.h                              (C) 2000-2026 */
+/* InternalBodyForceVonMises.h                                 (C) 2000-2026 */
 /*                                                                           */
 /* Contains functions to compute and assemble source term contribution to RHS*/
 /* corresponding to the internal force term for VonMises plasticity law      */
