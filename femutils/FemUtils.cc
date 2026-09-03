@@ -187,7 +187,7 @@ CaseTable* readFileAsCaseTable(IParallelMng* pm, const String& filename, const I
   if (is_bad)
     ARCANE_FATAL("Can not read file '{0}'");
   String file_as_str(bytes);
-  tm->info() << "FILE=" << file_as_str;
+  tm->info() << "FILE=\n" << file_as_str;
   UniqueArray<Real> file_values;
   is_bad = builtInGetValue(file_values, file_as_str);
   if (is_bad)
