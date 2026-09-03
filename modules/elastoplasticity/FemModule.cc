@@ -904,7 +904,7 @@ _checkNewtonConvergence()
 
   VariableDoFReal& residual_values(m_linear_system.rhsVariable());
   auto node_dof(m_dofs_on_nodes.nodeDoFConnectivityView());
-  _applyDirichlet0(residual_values, node_dof);
+  _applyZeroRHSOnConstrainedDOFs(residual_values, node_dof);
 
   Real l2_norm_rhs = _normL2(residual_values, node_dof);
 

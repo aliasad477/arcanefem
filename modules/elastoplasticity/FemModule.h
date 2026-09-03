@@ -83,7 +83,7 @@ class FemModuleElastoplasticity
   void _doStationarySolve();
   void _assembleBilinearOperator();
   void _assembleDirichletsNewtonGpu();
-  void _assembleDirichlets0Gpu();
+  void _assembleZeroRHSOnConstrainedDOFsGpu();
 
   inline void _applyInternalBodyForceVonMisesTria3Gpu(VariableDoFReal& rhs_values, const FemDoFsOnNodes& dofs_on_nodes, const VariableNodeReal3& node_coord, IMesh* mesh, RunQueue* queue);
 
@@ -171,7 +171,7 @@ class FemModuleElastoplasticity
 
 
   inline void _applyDirichletNewton(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
-  inline void _applyDirichlet0(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
+  inline void _applyZeroRHSOnConstrainedDOFs(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
 
 
   inline Real _normL2(VariableNodeReal3& u);
