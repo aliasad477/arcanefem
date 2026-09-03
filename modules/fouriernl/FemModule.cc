@@ -333,9 +333,6 @@ _assembleBilinearOperator()
   info() << "[ArcaneFem-Info] Started module _assembleBilinearOperator()";
   Real elapsedTime = platform::getRealTime();
 
-  if (m_is_hexa8_mesh && m_matrix_format == "AF-BSR")
-    ARCANE_FATAL("Hexa8 FourierNL assembly is not supported with matrix-format=AF-BSR");
-
   if (m_matrix_format == "BSR") {
     UnstructuredMeshConnectivityView m_connectivity_view(mesh());
     auto cn_cv = m_connectivity_view.cellNode();
@@ -353,7 +350,7 @@ _assembleBilinearOperator()
     else
       if (m_is_hexa8_mesh)
         m_bsr_format.assembleBilinearAtomic([=] ARCCORE_HOST_DEVICE(CellLocalId cell_lid) { return computeElementMatrixHexa8Gpu(cell_lid, cn_cv, in_node_coord, in_node_uk, m_nlin_exp_copy); });
-    else
+      else
         m_bsr_format.assembleBilinearAtomic([=] ARCCORE_HOST_DEVICE(CellLocalId cell_lid) { return computeElementMatrixTetra4Gpu(cell_lid, cn_cv, in_node_coord, in_node_uk, m_nlin_exp_copy); });
   }
 
@@ -372,7 +369,10 @@ _assembleBilinearOperator()
       else
         m_bsr_format.assembleBilinearAtomicFree([=] ARCCORE_HOST_DEVICE(CellLocalId cell_lid, Int32 node_lid) { return computeElementVectorTria3Gpu(cell_lid, cn_cv, in_node_coord, in_node_uk, node_lid, m_nlin_exp_copy); });
     else
-      m_bsr_format.assembleBilinearAtomicFree([=] ARCCORE_HOST_DEVICE(CellLocalId cell_lid, Int32 node_lid) { return computeElementVectorTetra4Gpu(cell_lid, cn_cv, in_node_coord, in_node_uk, node_lid, m_nlin_exp_copy); });
+      if (m_is_hexa8_mesh)
+        m_bsr_format.assembleBilinearAtomicFree([=] ARCCORE_HOST_DEVICE(CellLocalId cell_lid, Int32 node_lid) { return computeElementVectorHexa8Gpu(cell_lid, cn_cv, in_node_coord, in_node_uk, node_lid, m_nlin_exp_copy); });
+      else
+        m_bsr_format.assembleBilinearAtomicFree([=] ARCCORE_HOST_DEVICE(CellLocalId cell_lid, Int32 node_lid) { return computeElementVectorTetra4Gpu(cell_lid, cn_cv, in_node_coord, in_node_uk, node_lid, m_nlin_exp_copy); });
   }
 
   if (m_matrix_format == "DOK") {
