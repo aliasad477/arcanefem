@@ -153,6 +153,7 @@ compute()
   info() << "[ArcaneFem-Info] mesh nodes " << total_nb_node;
 
   _doStationarySolve();
+  _updateTimeVariables();
   _updateTime();
 
   elapsedTime = platform::getRealTime() - elapsedTime;
@@ -262,10 +263,10 @@ _doStationarySolve()
     if (m_solve_nonlinear_system)
       _solveNewton();
 
-  if(m_cross_validation)
-   if (t > 0. && t==tmax) {
-      _validateResults();
-    }
+   if(m_cross_validation)
+     if (t > 0. && t==tmax)
+       _validateResults();
+
 }
 
 /*---------------------------------------------------------------------------*/
@@ -329,9 +330,9 @@ _solveNewton()
     // --- update_increment ---- //
     _incrementVariables();
 
-    if (m_constitutive_law == "VonMises") {
+    if (m_constitutive_law == "VonMises")
       _updateGlobalTangentMaterialTensorVonMises();
-    }
+
 
     // --- assemble_linear_system ---- //
     if(m_assemble_nonlinear_system) {
@@ -346,7 +347,7 @@ _solveNewton()
       }
     }
 
-    // --- calculate_residual ---- //
+    // --- calculate_and_check_residual ---- //
     _checkNewtonConvergence();
 
   }
@@ -373,31 +374,9 @@ _solveNewton()
     ARCANE_FATAL("Newton iterations diverged after max iters");
   }
 
-  // TODO Move to stationary solve
-  // --- commit_displacements ---- //
-  m_U.synchronize();
-  m_DUn.synchronize();
-  ENUMERATE_ (Node, inode, ownNodes()) {
-    m_U[inode] += m_DUn[inode];
-  }
-  m_U.synchronize();
-
-    // --- commit_internal_variables ---- //
-  if (m_constitutive_law == "VonMises") {
-    ENUMERATE_ (Cell, icell, allCells())
-    {
-      Cell cell = *icell;
-
-      for (Int8 iGP = 0; iGP < m_nGP; ++iGP ) {
-        m_sigma_old_gp(cell, iGP, 0) = m_sigma_gp(cell, iGP, 0);
-        m_sigma_old_gp(cell, iGP, 1) = m_sigma_gp(cell, iGP, 1);
-        m_sigma_old_gp(cell, iGP, 2) = m_sigma_gp(cell, iGP, 2);
-
-        m_sigma_zz_old_gp(cell, iGP) = m_sigma_zz_gp(cell, iGP);
-        m_p_old_gp(cell, iGP) += m_dp_gp(cell, iGP);
-      }
-    }
-  }
+  // --- commit_internal_variables ---- //
+  if (m_constitutive_law == "VonMises")
+    _commitInternalVariablesVonMises();
 
 }
 
@@ -759,7 +738,7 @@ _readCaseTables()
  *
  * This method performs the following actions:
  *   1. Fetches values of solution from solved linear system to FEM variables,
- *      i.e., it copies RHS DOF to u.
+ *      i.e., it copies RHS DOF to du.
  *   2. Performs synchronize of FEM variables across subdomains.
  */
 /*---------------------------------------------------------------------------*/
@@ -794,6 +773,34 @@ _updateVariables()
 
   elapsedTime = platform::getRealTime() - elapsedTime;
   ArcaneFemFunctions::GeneralFunctions::printArcaneFemTime(traceMng(),"update-variables", elapsedTime);
+}
+
+/*---------------------------------------------------------------------------*/
+/**
+ * @brief Update the FEM variables in time.
+ *
+ * This method performs the following actions:
+ *   1. Fetches values of FEM variable DU for solved time step and,
+ *      adds it to global time FEM variable U.
+ *   2. Performs synchronize of FEM variables across subdomains.
+ */
+/*---------------------------------------------------------------------------*/
+
+void FemModuleElastoplasticity::
+_updateTimeVariables()
+{
+  info() << "[ArcaneFem-Info] Started module  _updateTimeVariables()";
+  Real elapsedTime = platform::getRealTime();
+
+  m_U.synchronize();
+  m_DUn.synchronize();
+  ENUMERATE_ (Node, inode, ownNodes()) {
+    m_U[inode] += m_DUn[inode];
+  }
+  m_U.synchronize();
+
+  elapsedTime = platform::getRealTime() - elapsedTime;
+  ArcaneFemFunctions::GeneralFunctions::printArcaneFemTime(traceMng(),"update-time-variables", elapsedTime);
 }
 
 /*---------------------------------------------------------------------------*/

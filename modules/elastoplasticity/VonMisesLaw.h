@@ -13,9 +13,9 @@
 
 /*---------------------------------------------------------------------------*/
 /**
- * @brief Applies the VonMises plasticity criteria to update the
- * tangent material tensor matrix at each quadrature point for each
- * element
+ * @brief Restores the initial or the converged solution state
+ * from the previous time step solve for stress and material
+ * tangent tensors at quadrature points
  *
  */
 /*---------------------------------------------------------------------------*/
@@ -38,6 +38,29 @@ inline void FemModuleElastoplasticity::_restoreConvergedStateVonMises()
   }
 }
 
+/*---------------------------------------------------------------------------*/
+/**
+ * @brief Commits to the internal state variables after convergence of the
+ * nonlinear solver for a given time step
+ *
+ */
+/*---------------------------------------------------------------------------*/
+inline void FemModuleElastoplasticity::_commitInternalVariablesVonMises()
+{
+  ENUMERATE_ (Cell, icell, allCells())
+  {
+    Cell cell = *icell;
+
+    for (Int8 iGP = 0; iGP < m_nGP; ++iGP ) {
+      m_sigma_old_gp(cell, iGP, 0) = m_sigma_gp(cell, iGP, 0);
+      m_sigma_old_gp(cell, iGP, 1) = m_sigma_gp(cell, iGP, 1);
+      m_sigma_old_gp(cell, iGP, 2) = m_sigma_gp(cell, iGP, 2);
+
+      m_sigma_zz_old_gp(cell, iGP) = m_sigma_zz_gp(cell, iGP);
+      m_p_old_gp(cell, iGP) += m_dp_gp(cell, iGP);
+    }
+  }
+}
 
 /*---------------------------------------------------------------------------*/
 /**

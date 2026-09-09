@@ -157,11 +157,13 @@ class FemModuleElastoplasticity
   void _updateNewtonIncrements();
   void _updateGuessFromIncrement();
   void _updateVariables();
+  void _updateTimeVariables();
   void _initBsr();
   void _initConstitutiveLaw();
 
   // Von Mises Law
   inline void _restoreConvergedStateVonMises();
+  inline void _commitInternalVariablesVonMises();
   inline void _updateGlobalTangentMaterialTensorVonMises();
   inline void _updateGlobalTangentMaterialTensorVonMisesTria3Cpu();
 
@@ -173,10 +175,8 @@ class FemModuleElastoplasticity
   inline void _applyTraction(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
   static inline void _applyPressureTableToRhsTria3(BC::ITractionBoundaryCondition* bs, const Real t, Int32 boundary_condition_index, const UniqueArray<Arcane::FemUtils::CaseTableInfo>& traction_case_table_list, const IndexedNodeDoFConnectivityView& node_dof, const VariableNodeReal3& node_coord, VariableDoFReal& rhs_values);
 
-
   inline void _applyDirichletNewton(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
   inline void _applyZeroRHSOnConstrainedDOFs(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
-
 
   inline Real _normL2(VariableNodeReal3& u);
   inline Real _normL2(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
