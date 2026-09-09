@@ -86,6 +86,7 @@ class FemModuleElastoplasticity
   void _assembleZeroRHSOnConstrainedDOFsGpu();
 
   inline void _applyInternalBodyForceVonMisesTria3Gpu(VariableDoFReal& rhs_values, const FemDoFsOnNodes& dofs_on_nodes, const VariableNodeReal3& node_coord, IMesh* mesh, RunQueue* queue);
+  inline void _updateGlobalTangentMaterialTensorVonMisesTria3Gpu();
 
  private:
 
