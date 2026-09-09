@@ -230,9 +230,10 @@ RealMatrix<12, 12> FemModuleElastoplasticity::_computeElementMatrixTetra4(Cell c
     return computeElementMatrixTetra4Base(dxu, dyu, dzu, volume, m_C_tang_3d);
   } else {
     RealMatrix<6, 6> C_tang_3d;
+    Int8 iGP = 0;
     for (Int32 ix = 0; ix < 6; ++ix) {
       for (Int32 iy = 0; iy < 6; ++iy) {
-        C_tang_3d(ix, iy) = m_C_tang_3d_cell(cell, ix, iy);
+        C_tang_3d(ix, iy) = m_C_tang_gp(cell, iGP, ix, iy);
       }
     }
     return computeElementMatrixTetra4Base(dxu, dyu, dzu, volume, C_tang_3d);

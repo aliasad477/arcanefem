@@ -114,9 +114,9 @@ _applyInternalBodyForceVonMisesTria3Cpu(VariableDoFReal& rhs_values, const Index
     Real3 dyu = ArcaneFemFunctions::FeOperation2D::computeGradientYTria3(cell, m_node_coord);
 
     Int8 iGP = 0; // for tria P1 elements nGP=1
-    Real sigma_xx = m_sigma_2d_gp(cell , iGP, 0);
-    Real sigma_yy = m_sigma_2d_gp(cell , iGP, 1);
-    Real sigma_xy = m_sigma_2d_gp(cell , iGP, 2);
+    Real sigma_xx = m_sigma_gp(cell , iGP, 0);
+    Real sigma_yy = m_sigma_gp(cell , iGP, 1);
+    Real sigma_xy = m_sigma_gp(cell , iGP, 2);
 
     RealVector<6> rhs = computeInternalBodyForceVonMisesTria3Base(dxu, dyu, area, { sigma_xx, sigma_yy, sigma_xy });
 
@@ -151,7 +151,7 @@ _applyInternalBodyForceVonMisesTria3Gpu(VariableDoFReal& rhs_values,
   auto in_out_rhs_values = Accelerator::viewInOut(command, rhs_values);
   auto in_node_coord = Accelerator::viewIn(command, node_coord);
 
-  auto in_sigma_2d_gp = Accelerator::viewIn(command, m_sigma_2d_gp);
+  auto in_sigma_gp = Accelerator::viewIn(command, m_sigma_gp);
 
   command << RUNCOMMAND_ENUMERATE(CellLocalId, cell_lid, mesh->allCells())
   {
@@ -160,9 +160,9 @@ _applyInternalBodyForceVonMisesTria3Gpu(VariableDoFReal& rhs_values,
     Real3 dyu = Arcane::FemUtils::Gpu::FeOperation2D::computeGradientYTria3(cell_lid, cn_cv, in_node_coord);
 
     Int8 iGP = 0; // for tria P1 elements nGP=1
-    Real sigma_xx = in_sigma_2d_gp(cell_lid , iGP, 0);
-    Real sigma_yy = in_sigma_2d_gp(cell_lid , iGP, 1);
-    Real sigma_xy = in_sigma_2d_gp(cell_lid , iGP, 2);
+    Real sigma_xx = in_sigma_gp(cell_lid , iGP, 0);
+    Real sigma_yy = in_sigma_gp(cell_lid , iGP, 1);
+    Real sigma_xy = in_sigma_gp(cell_lid , iGP, 2);
 
     RealVector<6> rhs = computeInternalBodyForceVonMisesTria3Base(dxu, dyu, area, { sigma_xx, sigma_yy, sigma_xy });
 

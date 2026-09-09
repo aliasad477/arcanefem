@@ -26,9 +26,9 @@ inline void FemModuleElastoplasticity::_restoreConvergedStateVonMises()
     Cell cell = *icell;
 
     for (Int8 iGP = 0; iGP < m_nGP; ++iGP ) {
-      m_sigma_2d_gp(cell, iGP, 0) = m_sigma_old_2d_gp(cell, iGP, 0);
-      m_sigma_2d_gp(cell, iGP, 1) = m_sigma_old_2d_gp(cell, iGP, 1);
-      m_sigma_2d_gp(cell, iGP, 2) = m_sigma_old_2d_gp(cell, iGP, 2);
+      m_sigma_gp(cell, iGP, 0) = m_sigma_old_gp(cell, iGP, 0);
+      m_sigma_gp(cell, iGP, 1) = m_sigma_old_gp(cell, iGP, 1);
+      m_sigma_gp(cell, iGP, 2) = m_sigma_old_gp(cell, iGP, 2);
     }
 
     for (Int8 iGP = 0; iGP < m_nGP; ++iGP)
@@ -99,11 +99,11 @@ inline void FemModuleElastoplasticity::_updateGlobalTangentMaterialTensorVonMise
       Real eps_yy = grad_DU(1, 1);
       Real eps_xy = M_SQRT1_2 * (grad_DU(0, 1) + grad_DU(1, 0));
 
-      Real sigma_trial_xx = m_sigma_old_2d_gp(cell, iGP, 0) + m_C_elas_2d(0, 0) * eps_xx + m_C_elas_2d(0, 1) * eps_yy + m_C_elas_2d(0, 2) * eps_xy;
-      Real sigma_trial_yy = m_sigma_old_2d_gp(cell, iGP, 1) + m_C_elas_2d(1, 0) * eps_xx + m_C_elas_2d(1, 1) * eps_yy + m_C_elas_2d(1, 2) * eps_xy;
-      Real sigma_trial_xy = m_sigma_old_2d_gp(cell, iGP, 2) + m_C_elas_2d(2, 0) * eps_xx + m_C_elas_2d(2, 1) * eps_yy + m_C_elas_2d(2, 2) * eps_xy;
+      Real sigma_trial_xx = m_sigma_old_gp(cell, iGP, 0) + m_C_elas_2d(0, 0) * eps_xx + m_C_elas_2d(0, 1) * eps_yy + m_C_elas_2d(0, 2) * eps_xy;
+      Real sigma_trial_yy = m_sigma_old_gp(cell, iGP, 1) + m_C_elas_2d(1, 0) * eps_xx + m_C_elas_2d(1, 1) * eps_yy + m_C_elas_2d(1, 2) * eps_xy;
+      Real sigma_trial_xy = m_sigma_old_gp(cell, iGP, 2) + m_C_elas_2d(2, 0) * eps_xx + m_C_elas_2d(2, 1) * eps_yy + m_C_elas_2d(2, 2) * eps_xy;
 
-      Real sigma_trial_zz = m_sigma_zz_old_2d_gp(cell, iGP) + lambda * (eps_xx + eps_yy);
+      Real sigma_trial_zz = m_sigma_zz_old_gp(cell, iGP) + lambda * (eps_xx + eps_yy);
 
       // Plane strain retains sigma_zz in the three-dimensional deviator.
       Real sigma_trial_mean = (sigma_trial_xx + sigma_trial_yy + sigma_trial_zz) / 3.0;
@@ -118,9 +118,9 @@ inline void FemModuleElastoplasticity::_updateGlobalTangentMaterialTensorVonMise
 
       // --- evaluate_yield_function ---- //
       // _computeYieldFunctionVM();
-      Real yield_function = sigma_eq_trial - sig0 - H * m_p_old_2d_gp(cell, iGP);
+      Real yield_function = sigma_eq_trial - sig0 - H * m_p_old_gp(cell, iGP);
       Real yield_positive = (yield_function + math::abs(yield_function)) / 2.;
-      m_dp_2d_gp(cell, iGP) = yield_positive/ (3. * mu + H);
+      m_dp_gp(cell, iGP) = yield_positive/ (3. * mu + H);
       Real plastic_switch = yield_positive / (math::abs(yield_function) + 1e-14 * sig0);
 
       // --- radial_return_update ---- //
@@ -130,7 +130,7 @@ inline void FemModuleElastoplasticity::_updateGlobalTangentMaterialTensorVonMise
       Real flowN_xy = plastic_switch * dev_xy / (sigma_eq_trial + 1e-14 * sig0);
       // Real flowN_zz = plastic_switch * dev_zz / (sigma_eq_trial + 1e-14 * sig0);
 
-      Real beta = 3. * mu * m_dp_2d_gp(cell, iGP) / (sigma_eq_trial + 1e-14 * sig0);
+      Real beta = 3. * mu * m_dp_gp(cell, iGP) / (sigma_eq_trial + 1e-14 * sig0);
 
       // --- update_consistent_tangent ---- //
       // _updateStressTensorVM();
@@ -140,11 +140,11 @@ inline void FemModuleElastoplasticity::_updateGlobalTangentMaterialTensorVonMise
 
       Real sigma_zz = sigma_trial_zz - dev_zz * beta;
 
-      m_sigma_2d_gp(cell, iGP, 0) = sigma_xx;
-      m_sigma_2d_gp(cell, iGP, 1) = sigma_yy;
-      m_sigma_2d_gp(cell, iGP, 2) = sigma_xy;
+      m_sigma_gp(cell, iGP, 0) = sigma_xx;
+      m_sigma_gp(cell, iGP, 1) = sigma_yy;
+      m_sigma_gp(cell, iGP, 2) = sigma_xy;
 
-      m_sigma_zz_2d_gp(cell, iGP) = sigma_zz;
+      m_sigma_zz_gp(cell, iGP) = sigma_zz;
 
       // _updateTangentMaterialTensorVM();
       Real tangentA = 3.* mu * (3. * mu / (3. * mu + H) - beta);
@@ -174,13 +174,13 @@ inline void FemModuleElastoplasticity::_updateGlobalTangentMaterialTensorVonMise
   auto command = Accelerator::makeCommand(queue);
 
   auto in_out_C_tang_gp = Accelerator::viewInOut(command, m_C_tang_gp);
-  auto in_out_dp_2d_gp = Accelerator::viewInOut(command, m_dp_2d_gp);
-  auto in_out_sigma_2d_gp = Accelerator::viewInOut(command, m_sigma_2d_gp);
-  auto in_out_sigma_zz_2d_gp = Accelerator::viewInOut(command, m_sigma_zz_2d_gp);
+  auto in_out_dp_gp = Accelerator::viewInOut(command, m_dp_gp);
+  auto in_out_sigma_gp = Accelerator::viewInOut(command, m_sigma_gp);
+  auto in_out_sigma_zz_gp = Accelerator::viewInOut(command, m_sigma_zz_gp);
 
-  auto in_sigma_old_2d_gp = Accelerator::viewIn(command, m_sigma_old_2d_gp);
-  auto in_sigma_zz_old_2d_gp = Accelerator::viewIn(command, m_sigma_zz_old_2d_gp);
-  auto in_p_old_2d_gp = Accelerator::viewIn(command, m_p_old_2d_gp);
+  auto in_sigma_old_gp = Accelerator::viewIn(command, m_sigma_old_gp);
+  auto in_sigma_zz_old_gp = Accelerator::viewIn(command, m_sigma_zz_old_gp);
+  auto in_p_old_gp = Accelerator::viewIn(command, m_p_old_gp);
 
   auto in_node_coord = Accelerator::viewIn(command, m_node_coord);
   auto in_DUn = Accelerator::viewIn(command, m_DUn);
@@ -203,11 +203,11 @@ inline void FemModuleElastoplasticity::_updateGlobalTangentMaterialTensorVonMise
       Real eps_yy = grad_DU(1, 1);
       Real eps_xy = 0.70710678118654752440 * (grad_DU(0, 1) + grad_DU(1, 0));
 
-      Real sigma_trial_xx = in_sigma_old_2d_gp(cell_lid, iGP, 0) + in_C_elas_2d(0, 0) * eps_xx + in_C_elas_2d(0, 1) * eps_yy + in_C_elas_2d(0, 2) * eps_xy;
-      Real sigma_trial_yy = in_sigma_old_2d_gp(cell_lid, iGP, 1) + in_C_elas_2d(1, 0) * eps_xx + in_C_elas_2d(1, 1) * eps_yy + in_C_elas_2d(1, 2) * eps_xy;
-      Real sigma_trial_xy = in_sigma_old_2d_gp(cell_lid, iGP, 2) + in_C_elas_2d(2, 0) * eps_xx + in_C_elas_2d(2, 1) * eps_yy + in_C_elas_2d(2, 2) * eps_xy;
+      Real sigma_trial_xx = in_sigma_old_gp(cell_lid, iGP, 0) + in_C_elas_2d(0, 0) * eps_xx + in_C_elas_2d(0, 1) * eps_yy + in_C_elas_2d(0, 2) * eps_xy;
+      Real sigma_trial_yy = in_sigma_old_gp(cell_lid, iGP, 1) + in_C_elas_2d(1, 0) * eps_xx + in_C_elas_2d(1, 1) * eps_yy + in_C_elas_2d(1, 2) * eps_xy;
+      Real sigma_trial_xy = in_sigma_old_gp(cell_lid, iGP, 2) + in_C_elas_2d(2, 0) * eps_xx + in_C_elas_2d(2, 1) * eps_yy + in_C_elas_2d(2, 2) * eps_xy;
 
-      Real sigma_trial_zz = in_sigma_zz_old_2d_gp(cell_lid, iGP) + in_C_elas_2d(0, 1) * eps_yy + in_C_elas_2d(1, 0) * eps_xx;
+      Real sigma_trial_zz = in_sigma_zz_old_gp(cell_lid, iGP) + in_C_elas_2d(0, 1) * eps_yy + in_C_elas_2d(1, 0) * eps_xx;
 
       // Plane strain retains sigma_zz in the three-dimensional deviator.
       Real sigma_trial_mean = (sigma_trial_xx + sigma_trial_yy + sigma_trial_zz) / 3.0;
@@ -222,9 +222,9 @@ inline void FemModuleElastoplasticity::_updateGlobalTangentMaterialTensorVonMise
 
       // --- evaluate_yield_function ---- //
       // _computeYieldFunctionVM();
-      Real yield_function = sigma_eq_trial - in_sig0 - in_H * in_p_old_2d_gp(cell_lid, iGP);
+      Real yield_function = sigma_eq_trial - in_sig0 - in_H * in_p_old_gp(cell_lid, iGP);
       Real yield_positive = (yield_function + math::abs(yield_function)) / 2.;
-      in_out_dp_2d_gp(cell_lid, iGP) = yield_positive/ (3. * in_mu + in_H);
+      in_out_dp_gp(cell_lid, iGP) = yield_positive/ (3. * in_mu + in_H);
       Real plastic_switch = yield_positive / (math::abs(yield_function) + 1e-14 * in_sig0);
 
       // --- radial_return_update ---- //
@@ -234,7 +234,7 @@ inline void FemModuleElastoplasticity::_updateGlobalTangentMaterialTensorVonMise
       Real flowN_xy = plastic_switch * dev_xy / (sigma_eq_trial + 1e-14 * in_sig0);
       // Real flowN_zz = plastic_switch * dev_zz / (sigma_eq_trial + 1e-14 * in_sig0);
 
-      Real beta = 3. * in_mu * in_out_dp_2d_gp(cell_lid, iGP) / (sigma_eq_trial + 1e-14 * in_sig0);
+      Real beta = 3. * in_mu * in_out_dp_gp(cell_lid, iGP) / (sigma_eq_trial + 1e-14 * in_sig0);
 
       // --- update_consistent_tangent ---- //
       // _updateStressTensorVM();
@@ -244,11 +244,11 @@ inline void FemModuleElastoplasticity::_updateGlobalTangentMaterialTensorVonMise
 
       Real sigma_zz = sigma_trial_zz - dev_zz * beta;
 
-      in_out_sigma_2d_gp(cell_lid, iGP, 0) = sigma_xx;
-      in_out_sigma_2d_gp(cell_lid, iGP, 1) = sigma_yy;
-      in_out_sigma_2d_gp(cell_lid, iGP, 2) = sigma_xy;
+      in_out_sigma_gp(cell_lid, iGP, 0) = sigma_xx;
+      in_out_sigma_gp(cell_lid, iGP, 1) = sigma_yy;
+      in_out_sigma_gp(cell_lid, iGP, 2) = sigma_xy;
 
-      in_out_sigma_zz_2d_gp(cell_lid, iGP) = sigma_zz;
+      in_out_sigma_zz_gp(cell_lid, iGP) = sigma_zz;
 
       // _updateTangentMaterialTensorVM();
       Real tangentA = 3.* in_mu * (3. * in_mu / (3. * in_mu + in_H) - beta);

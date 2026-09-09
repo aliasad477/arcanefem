@@ -69,13 +69,20 @@ startInit()
         m_nGP = 4;
       else
         m_nGP = 1;
+
       m_C_tang_gp.reshape({m_nGP, 3, 3 });
+      m_sigma_gp.reshape({m_nGP, 3});
+      m_sigma_old_gp.reshape({m_nGP, 3});
+      m_sigma_zz_gp.reshape({m_nGP});
+      m_sigma_zz_old_gp.reshape({m_nGP});
     } else {
-      // if (m_hex_quad_mesh)
-      //   m_nGP = 4;
-      // else
-      //   m_nGP = 1;
-      m_C_tang_3d_cell.reshape({ 6, 6 });
+      if (m_hex_quad_mesh)
+        m_nGP = 8;
+      else
+        m_nGP = 1;
+      m_C_tang_gp.reshape({ m_nGP, 6, 6 });
+      m_sigma_gp.reshape({m_nGP, 6});
+      m_sigma_old_gp.reshape({m_nGP, 6});
     }
   }
 
@@ -199,27 +206,16 @@ _initConstitutiveLaw()
     }
   }
 
-  // The native von Mises update stores one algorithmic tangent per integration
-  // point. Tria3 has one integration point, so a cell variable is sufficient.
   if (m_constitutive_law == "VonMises" || m_constitutive_law == "DruckerPrager") {
-    m_gp_material_tensor_strategy = "global";
+    if (m_gp_material_tensor_strategy == "local")
+      ARCANE_FATAL("Local material tensor strategy not supported for plasticity laws");
 
     if (mesh()->dimension() != 2 || m_hex_quad_mesh)
       ARCANE_FATAL("Native von Mises plasticity currently supports only 2D Tria3 elements");
 
-    if (mesh()->dimension() == 2) {
-      m_sigma_2d_gp.reshape({m_nGP, 3});
-      m_sigma_old_2d_gp.reshape({m_nGP, 3});
-
-      m_sigma_zz_2d_gp.reshape({m_nGP});
-      m_sigma_zz_old_2d_gp.reshape({m_nGP});
-      m_p_old_2d_gp.reshape({m_nGP});
-      m_dp_2d_gp.reshape({m_nGP});
-    }
+    m_p_old_gp.reshape({m_nGP});
+    m_dp_gp.reshape({m_nGP});
   }
-
-
-
   elapsedTime = platform::getRealTime() - elapsedTime;
   ArcaneFemFunctions::GeneralFunctions::printArcaneFemTime(traceMng(),"initialize-constitutive-law", elapsedTime);
 }
@@ -393,12 +389,12 @@ _solveNewton()
       Cell cell = *icell;
 
       for (Int8 iGP = 0; iGP < m_nGP; ++iGP ) {
-        m_sigma_old_2d_gp(cell, iGP, 0) = m_sigma_2d_gp(cell, iGP, 0);
-        m_sigma_old_2d_gp(cell, iGP, 1) = m_sigma_2d_gp(cell, iGP, 1);
-        m_sigma_old_2d_gp(cell, iGP, 2) = m_sigma_2d_gp(cell, iGP, 2);
+        m_sigma_old_gp(cell, iGP, 0) = m_sigma_gp(cell, iGP, 0);
+        m_sigma_old_gp(cell, iGP, 1) = m_sigma_gp(cell, iGP, 1);
+        m_sigma_old_gp(cell, iGP, 2) = m_sigma_gp(cell, iGP, 2);
 
-        m_sigma_zz_old_2d_gp(cell, iGP) = m_sigma_zz_2d_gp(cell, iGP);
-        m_p_old_2d_gp(cell, iGP) += m_dp_2d_gp(cell, iGP);
+        m_sigma_zz_old_gp(cell, iGP) = m_sigma_zz_gp(cell, iGP);
+        m_p_old_gp(cell, iGP) += m_dp_gp(cell, iGP);
       }
     }
   }
@@ -446,18 +442,18 @@ _getMaterialParameters()
       ENUMERATE_ (Cell, icell, allCells()) // TODO check if MDMeshVars provide initialisation method
       {
         for (Int8 iGP = 0; iGP < m_nGP; ++iGP ) {
-          m_sigma_2d_gp(icell, iGP, 0) = 0.;
-          m_sigma_2d_gp(icell, iGP, 1) = 0.;
-          m_sigma_2d_gp(icell, iGP, 2) = 0.;
-          m_sigma_zz_2d_gp(icell, iGP) = 0.;
+          m_sigma_gp(icell, iGP, 0) = 0.;
+          m_sigma_gp(icell, iGP, 1) = 0.;
+          m_sigma_gp(icell, iGP, 2) = 0.;
+          m_sigma_zz_gp(icell, iGP) = 0.;
 
-          m_sigma_old_2d_gp(icell, iGP, 0) = 0.;
-          m_sigma_old_2d_gp(icell, iGP, 1) = 0.;
-          m_sigma_old_2d_gp(icell, iGP, 2) = 0.;
-          m_sigma_zz_old_2d_gp(icell, iGP) = 0.;
+          m_sigma_old_gp(icell, iGP, 0) = 0.;
+          m_sigma_old_gp(icell, iGP, 1) = 0.;
+          m_sigma_old_gp(icell, iGP, 2) = 0.;
+          m_sigma_zz_old_gp(icell, iGP) = 0.;
 
-          m_p_old_2d_gp(icell, iGP) = 0.;
-          m_dp_2d_gp(icell, iGP) = 0.;
+          m_p_old_gp(icell, iGP) = 0.;
+          m_dp_gp(icell, iGP) = 0.;
         }
       }
 
@@ -506,9 +502,11 @@ _getMaterialParameters()
         m_C_tang_3d = m_C_elas_3d;
       } else {
         ENUMERATE_ (Cell, icell, allCells()) {
-          for (Int8 ix = 0; ix < 6; ++ix) {
-            for (Int8 iy = 0; iy < 6; ++iy) {
-              m_C_tang_3d_cell(icell,ix, iy) = m_C_elas_3d(ix, iy);
+          for (Int8 iGP = 0; iGP < m_nGP; ++iGP) {
+            for (Int8 ix = 0; ix < 6; ++ix) {
+              for (Int8 iy = 0; iy < 6; ++iy) {
+                m_C_tang_gp(icell, iGP, ix, iy) = m_C_elas_3d(ix, iy);
+              }
             }
           }
         }
