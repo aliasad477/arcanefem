@@ -88,7 +88,7 @@
       <description>Boolean to use hexagonal quadrature for element matrix assembly.</description>
     </simple>
 
-    <!-- - - - - - constitutive law for plasticity/elasticity - - - - TODO make complex type - -->
+    <!-- - - - - - constitutive law for plasticity/elasticity - - - - -->
     <complex name="constitutive-law"
              type="ConstitutiveLaw"
              minOccurs = "0"
