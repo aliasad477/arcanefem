@@ -40,9 +40,9 @@ startInit()
   tmax = options()->tmax(); // max time 𝑡ₘₐₓ
   dt = options()->dt(); // time step δ𝑡
 
-  E = options()->E(); // Youngs modulus
-  nu = options()->nu(); // Poission ratio ν
-  sig0 = options()->sig0(); // Yield Strength
+
+
+  _initConstitutiveLaw();
 
   m_dof_per_node = defaultMesh()->dimension();
   m_matrix_format = options()->matrixFormat();
@@ -55,7 +55,6 @@ startInit()
 
   m_dofs_on_nodes.initialize(defaultMesh(), m_dof_per_node);
 
-  m_constitutive_law = options()->constitutiveLaw();
   m_newton_max_iters = options()->newtonMaxIters();
   m_newton_atol = options()->newtonAtol();
   m_newton_rtol = options()->newtonRtol();
@@ -178,12 +177,54 @@ compute()
 /*---------------------------------------------------------------------------*/
 /*---------------------------------------------------------------------------*/
 
+/*---------------------------------------------------------------------------*/
+/**
+ * @brief Updates time.
+ */
+/*---------------------------------------------------------------------------*/
 void FemModuleElastoplasticity::
 _updateTime()
 {
   t += dt;
 }
 
+
+/*---------------------------------------------------------------------------*/
+/**
+ * @brief Initializes constitutive law parameters.
+ */
+/*---------------------------------------------------------------------------*/
+
+void FemModuleElastoplasticity::
+_initConstitutiveLaw()
+{
+  info() << "[ArcaneFem-Info] Started module  _initConstitutiveLaw()";
+  Real elapsedTime = platform::getRealTime();
+
+  for (const auto& constitutive_law : options()->constitutiveLaw()) {
+    String law_name = constitutive_law->law();
+    m_constitutive_law = law_name;
+    if (law_name == "VonMises") {
+      for (const auto von_mises : constitutive_law->vonMises()) {
+        E = von_mises->E(); // Youngs modulus
+        nu = von_mises->nu(); // Poission ratio ν
+        sig0 = von_mises->sig0(); // Yield Strength
+      }
+    } else if (law_name == "DruckerPrager") {
+      for (const auto drucker_prager : constitutive_law->druckerPrager()) {
+        E = drucker_prager->E(); // Youngs modulus
+        nu = drucker_prager->nu(); // Poission ratio ν
+        cohesion = drucker_prager->cohesion(); // Cohesion
+        friction_angle = drucker_prager->frictionAngle(); // Friction angle
+      }
+    } else {
+      ARCANE_FATAL("Undefined constitutive law");
+    }
+  }
+
+  elapsedTime = platform::getRealTime() - elapsedTime;
+  ArcaneFemFunctions::GeneralFunctions::printArcaneFemTime(traceMng(),"initialize-constitutive-law", elapsedTime);
+}
 
 /*---------------------------------------------------------------------------*/
 /**

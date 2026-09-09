@@ -21,11 +21,15 @@
   <fem>
     <tmax>21.</tmax>
     <dt>1.</dt>
-    <constitutive-law>VonMises</constitutive-law>
+    <constitutive-law>
+      <law>VonMises</law>
+      <von-mises>
+        <E>70.0e3</E>
+        <nu>0.3</nu>
+        <sig0>250.</sig0>
+      </von-mises>
+    </constitutive-law>
     <gp-material-tensor-strategy>global</gp-material-tensor-strategy>
-    <E>70.0e3</E>
-    <nu>0.3</nu>
-    <sig0>250.</sig0>
     <f>NULL NULL</f>
     <boundary-conditions>
       <dirichlet>

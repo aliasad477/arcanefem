@@ -101,6 +101,8 @@ class FemModuleElastoplasticity
   Real E; // Youngs modulus
   Real nu; // Poisson ratio
   Real sig0; // Yield strength
+  Real cohesion; // Yield strength
+  Real friction_angle; // Yield strength
   Real mu;
   Real lambda;
   Real Et; // Tangent modulus
@@ -155,6 +157,7 @@ class FemModuleElastoplasticity
   void _updateGuessFromIncrement();
   void _updateVariables();
   void _initBsr();
+  void _initConstitutiveLaw();
 
   // Von Mises Law
   inline void _restoreConvergedStateVonMises();

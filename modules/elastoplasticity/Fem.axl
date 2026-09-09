@@ -89,21 +89,58 @@
     </simple>
 
     <!-- - - - - - constitutive law for plasticity/elasticity - - - - TODO make complex type - -->
-    <simple name="constitutive-law" type="string" default="VonMises" optional="true">
-      <description>Which constitutive law to use VonMises|Drucker-Prager|Hooke.</description>
-    </simple>
+    <complex name="constitutive-law"
+             type="ConstitutiveLaw"
+             minOccurs = "0"
+             maxOccurs = "1"
+      >
+      <description>
+        List of constitutive laws to use from VonMises|DruckerPrager|Hooke.
+      </description>
+      <simple name="law" type="string" default="VonMises">
+        <description>Name of constitutive law</description>
+      </simple>
+      <complex name="von-mises"
+               type="VonMises"
+               minOccurs = "0"
+               maxOccurs = "1"
+        >
+        <description>
+          List of parameters for VonMises law
+        </description>
+        <simple name="E" type="real" default="70.e3">
+          <description>Youngs Modulus of the material.</description>
+        </simple>
+        <simple name="nu" type="real" default="0.3">
+          <description>Poissons ratio of the material.</description>
+        </simple>
+        <simple name="sig0" type="real" default="250.0">
+          <description>Yeild strength of the material.</description>
+        </simple>
+      </complex>
 
-    <simple name="E" type="real" default="0.0">
-      <description>Youngs Modulus of the material.</description>
-    </simple>
-
-    <simple name="nu" type="real" default="0.0">
-      <description>Poissons ratio of the material.</description>
-    </simple>
-
-    <simple name="sig0" type="real" default="0.0">
-      <description>Yeild strength of material.</description>
-    </simple>
+      <complex name="drucker-prager"
+               type="DruckerPrager"
+               minOccurs = "0"
+               maxOccurs = "1"
+        >
+        <description>
+          List of parameters for DruckerPrager law
+        </description>
+        <simple name="E" type="real" default="1.e7">
+          <description>Youngs Modulus of the material.</description>
+        </simple>
+        <simple name="nu" type="real" default="0.48">
+          <description>Poissons ratio of the material.</description>
+        </simple>
+        <simple name="cohesion" type="real" default="450.0">
+          <description>Cohesion parameter of the material.</description>
+        </simple>
+        <simple name="friction-angle" type="real" default="0.35">
+          <description>Friction angle parameter of the material.</description>
+        </simple>
+      </complex>
+    </complex>
 
     <!-- - - - - - nonlinear-analysis-parameters - - - - -->
     <simple name="check-bilinear-operator-for-residual" type="bool" default="false" optional="true">
