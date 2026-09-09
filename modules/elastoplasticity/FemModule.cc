@@ -20,8 +20,9 @@
 #include "ExternalBodyForce.h"
 #include "Traction.h"
 #include "Dirichlet.h"
-#include "InternalBodyForceVonMises.h"
+#include "InternalBodyForce.h"
 #include "VonMisesLaw.h"
+#include "DruckerPragerLaw.h"
 
 /*---------------------------------------------------------------------------*/
 /**
@@ -214,8 +215,18 @@ _initConstitutiveLaw()
     if (mesh()->dimension() != 2 || m_hex_quad_mesh)
       ARCANE_FATAL("Native von Mises plasticity currently supports only 2D Tria3 elements");
 
-    m_p_old_gp.reshape({m_nGP});
-    m_dp_gp.reshape({m_nGP});
+    if (m_constitutive_law == "VonMises") {
+      m_p_old_gp.reshape({m_nGP});
+      m_dp_gp.reshape({m_nGP});
+    }
+
+    if (m_constitutive_law == "DruckerPrager") {
+      m_eps_p_gp.reshape({m_nGP, 3});
+      m_eps_p_old_gp.reshape({m_nGP, 3});
+      m_eps_p_zz_gp.reshape({m_nGP});
+      m_eps_p_zz_old_gp.reshape({m_nGP});
+    }
+
   }
   elapsedTime = platform::getRealTime() - elapsedTime;
   ArcaneFemFunctions::GeneralFunctions::printArcaneFemTime(traceMng(),"initialize-constitutive-law", elapsedTime);
@@ -302,6 +313,8 @@ _solveNewton()
 
   if (m_constitutive_law == "VonMises") {
     _restoreConvergedStateVonMises();
+  } else if (m_constitutive_law == "DruckerPrager") {
+    _restoreConvergedStateDruckerPrager();
   }
 
   // --- assemble_linear_system ---- //
@@ -330,9 +343,11 @@ _solveNewton()
     // --- update_increment ---- //
     _incrementVariables();
 
-    if (m_constitutive_law == "VonMises")
+    if (m_constitutive_law == "VonMises") {
       _updateGlobalTangentMaterialTensorVonMises();
-
+    } else if (m_constitutive_law == "DruckerPrager") {
+      _updateGlobalTangentMaterialTensorDruckerPrager();
+    }
 
     // --- assemble_linear_system ---- //
     if(m_assemble_nonlinear_system) {
@@ -363,6 +378,12 @@ _solveNewton()
       }
       Real tl = math::sqrt(1.1 / tmax * (t));
       info() << "[ArcaneFem-Info] At Time Step " << t - 1 << ":\tPressure applied: " << Qlim * tl << "\tNewton iters: " << m_newton_iter << "\tresidual norm: " << m_residual_norm;
+    } else if (m_constitutive_law == "DruckerPrager") {
+      if (t == dt) {
+        max_settlement = 0.03;
+      }
+      Real tl = t / tmax;
+      info() << "[ArcaneFem-Info] At Time Step " << t - 1 << ":\tPressure applied: " << max_settlement * tl << "\tNewton iters: " << m_newton_iter << "\tresidual norm: " << m_residual_norm;
     }
 
     m_newton_solver_converged = false;
@@ -375,9 +396,11 @@ _solveNewton()
   }
 
   // --- commit_internal_variables ---- //
-  if (m_constitutive_law == "VonMises")
+  if (m_constitutive_law == "VonMises") {
     _commitInternalVariablesVonMises();
-
+  } else if (m_constitutive_law == "DruckerPrager") {
+    _commitInternalVariablesDruckerPrager();
+  }
 }
 
 /*---------------------------------------------------------------------------*/
@@ -402,6 +425,39 @@ _getMaterialParameters()
     Et = E / 100.;
     H = E * Et / (E - Et);
 
+    ENUMERATE_ (Cell, icell, allCells())
+    {
+      for (Int8 iGP = 0; iGP < m_nGP; ++iGP ) {
+        m_p_old_gp(icell, iGP) = 0.;
+        m_dp_gp(icell, iGP) = 0.;
+      }
+    }
+
+  } else if (m_constitutive_law == "DruckerPrager") {
+
+    mu = (E / (2 * (1 + nu))); // lame parameter μ
+    lambda = E * nu / ((1 + nu) * (1 - 2 * nu)); // lame parameter λ
+
+    bulk   = E/(3.*(1.-2.*nu));
+    dpEta  = 3. * tan(friction_angle) / math::sqrt(9. + 12. * tan(friction_angle * friction_angle));
+    dpC    = 3. * cohesion / sqrt(9.+ 12. * tan(friction_angle * friction_angle));
+
+    ENUMERATE_ (Cell, icell, allCells())
+    {
+      for (Int8 iGP = 0; iGP < m_nGP; ++iGP ) {
+        m_eps_p_gp(icell, iGP, 0) = 0.;
+        m_eps_p_gp(icell, iGP, 1) = 0.;
+        m_eps_p_gp(icell, iGP, 2) = 0.;
+        m_eps_p_zz_gp(icell, iGP) = 0.;
+        m_eps_p_old_gp(icell, iGP, 0) = 0.;
+        m_eps_p_old_gp(icell, iGP, 1) = 0.;
+        m_eps_p_old_gp(icell, iGP, 2) = 0.;
+        m_eps_p_zz_old_gp(icell, iGP) = 0.;
+      }
+    }
+  }
+
+  if (m_constitutive_law == "VonMises" || m_constitutive_law == "DruckerPrager") {
     if (mesh()->dimension() == 2) {
 
       // Initialize elastic part of the material tensor
@@ -430,9 +486,6 @@ _getMaterialParameters()
           m_sigma_old_gp(icell, iGP, 1) = 0.;
           m_sigma_old_gp(icell, iGP, 2) = 0.;
           m_sigma_zz_old_gp(icell, iGP) = 0.;
-
-          m_p_old_gp(icell, iGP) = 0.;
-          m_dp_gp(icell, iGP) = 0.;
         }
       }
 
@@ -528,9 +581,7 @@ _assembleLinearOperator()
   _applyExternalBodyForce(rhs_values, node_dof);
   _applyTraction(rhs_values, node_dof);
 
-  if (m_constitutive_law == "VonMises") {
-    _applyInternalBodyForceVonMises(rhs_values, node_dof);
-  }
+  _applyInternalBodyForce(rhs_values, node_dof);
 
   _applyDirichletNewton(rhs_values, node_dof);
 
