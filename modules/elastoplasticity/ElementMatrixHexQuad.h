@@ -89,9 +89,11 @@ RealMatrix<8, 8> FemModuleElastoplasticity::_computeElementMatrixQuad4(Cell cell
         ae += computeElementMatrixQuad4Base(dxU, dyU, integration_weight, m_C_tang_2d);
       } else {
         RealMatrix<3, 3> C_tang_2d;
-        for (Int32 ix = 0; ix < 3; ++ix) {
-          for (Int32 iy = 0; iy < 3; ++iy) {
-            C_tang_2d(ix, iy) = m_C_tang_2d_cell(cell, ix, iy);
+        for (Int32 iGP = 0; iGP < m_nGP; ++iGP) {
+          for (Int32 ix = 0; ix < 3; ++ix) {
+            for (Int32 iy = 0; iy < 3; ++iy) {
+              C_tang_2d(ix, iy) = m_C_tang_gp(cell, iGP, ix, iy);
+            }
           }
         }
         ae += computeElementMatrixQuad4Base(dxU, dyU, integration_weight, C_tang_2d);

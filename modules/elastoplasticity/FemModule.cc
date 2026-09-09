@@ -40,10 +40,6 @@ startInit()
   tmax = options()->tmax(); // max time 𝑡ₘₐₓ
   dt = options()->dt(); // time step δ𝑡
 
-
-
-  _initConstitutiveLaw();
-
   m_dof_per_node = defaultMesh()->dimension();
   m_matrix_format = options()->matrixFormat();
   m_assemble_linear_system = options()->assembleLinearSystem();
@@ -67,42 +63,23 @@ startInit()
   m_gp_material_tensor_strategy = options()->gpMaterialTensorStrategy();
   m_check_with_bilinear_operator = options()->checkBilinearOperatorForResidual();
 
-  // The native von Mises update stores one algorithmic tangent per integration
-  // point. Tria3 has one integration point, so a cell variable is sufficient.
-  if (m_constitutive_law == "VonMises")
-    m_gp_material_tensor_strategy = "global";
-
   if (m_gp_material_tensor_strategy == "global") {
     if (mesh()->dimension() == 2) {
-      m_C_tang_2d_cell.reshape({ 3, 3 });
+      if (m_hex_quad_mesh)
+        m_nGP = 4;
+      else
+        m_nGP = 1;
+      m_C_tang_gp.reshape({m_nGP, 3, 3 });
     } else {
+      // if (m_hex_quad_mesh)
+      //   m_nGP = 4;
+      // else
+      //   m_nGP = 1;
       m_C_tang_3d_cell.reshape({ 6, 6 });
     }
   }
 
-  if (m_constitutive_law == "VonMises") {
-
-    if (mesh()->dimension() != 2 || m_hex_quad_mesh)
-      ARCANE_FATAL("Native von Mises plasticity currently supports only 2D Tria3 elements");
-
-    if (mesh()->dimension() == 2) {
-
-      m_nGP = 1;
-
-      // m_epsilon_2d_gp.reshape({m_nGP, 3}); // not needed to store for Von Mises law
-      m_sigma_2d_gp.reshape({m_nGP, 3});
-      m_sigma_old_2d_gp.reshape({m_nGP, 3});
-      // m_sigma_trial_2d_gp.reshape({m_nGP, 3}); // not needed to store for Von Mises law
-      // m_dev_2d_gp.reshape({m_nGP, 3}); // not needed to store for Von Mises law
-      // m_flowN_2d_gp.reshape({m_nGP, 3}); // not needed to store for Von Mises law
-
-      m_sigma_zz_2d_gp.reshape({m_nGP});
-      m_sigma_zz_old_2d_gp.reshape({m_nGP});
-      m_p_old_2d_gp.reshape({m_nGP});
-      m_dp_2d_gp.reshape({m_nGP});
-
-    }
-  }
+  _initConstitutiveLaw();
 
   t = dt;
   tmax = tmax - dt;
@@ -221,6 +198,27 @@ _initConstitutiveLaw()
       ARCANE_FATAL("Undefined constitutive law");
     }
   }
+
+  // The native von Mises update stores one algorithmic tangent per integration
+  // point. Tria3 has one integration point, so a cell variable is sufficient.
+  if (m_constitutive_law == "VonMises" || m_constitutive_law == "DruckerPrager") {
+    m_gp_material_tensor_strategy = "global";
+
+    if (mesh()->dimension() != 2 || m_hex_quad_mesh)
+      ARCANE_FATAL("Native von Mises plasticity currently supports only 2D Tria3 elements");
+
+    if (mesh()->dimension() == 2) {
+      m_sigma_2d_gp.reshape({m_nGP, 3});
+      m_sigma_old_2d_gp.reshape({m_nGP, 3});
+
+      m_sigma_zz_2d_gp.reshape({m_nGP});
+      m_sigma_zz_old_2d_gp.reshape({m_nGP});
+      m_p_old_2d_gp.reshape({m_nGP});
+      m_dp_2d_gp.reshape({m_nGP});
+    }
+  }
+
+
 
   elapsedTime = platform::getRealTime() - elapsedTime;
   ArcaneFemFunctions::GeneralFunctions::printArcaneFemTime(traceMng(),"initialize-constitutive-law", elapsedTime);
@@ -437,12 +435,12 @@ _getMaterialParameters()
         lambda        lambda + 2mu   0
           0             0           2mu
       */
-      m_C_2d.fill(0.);
-      m_C_2d(0, 0) = lambda + 2. * mu;
-      m_C_2d(1, 1) = lambda + 2. * mu;
-      m_C_2d(2, 2) = 2. * mu;
-      m_C_2d(0, 1) = lambda;
-      m_C_2d(1, 0) = lambda;
+      m_C_elas_2d.fill(0.);
+      m_C_elas_2d(0, 0) = lambda + 2. * mu;
+      m_C_elas_2d(1, 1) = lambda + 2. * mu;
+      m_C_elas_2d(2, 2) = 2. * mu;
+      m_C_elas_2d(0, 1) = lambda;
+      m_C_elas_2d(1, 0) = lambda;
 
       // Initialize constitutive history
       ENUMERATE_ (Cell, icell, allCells()) // TODO check if MDMeshVars provide initialisation method
@@ -465,12 +463,14 @@ _getMaterialParameters()
 
       // Initialize the tangent material tensor
       if (m_gp_material_tensor_strategy == "local") {
-        m_C_tang_2d = m_C_2d;
+        m_C_tang_2d = m_C_elas_2d;
       } else {
         ENUMERATE_ (Cell, icell, allCells()) {
-          for (Int8 ix = 0; ix < 3; ++ix) {
-            for (Int8 iy = 0; iy < 3; ++iy) {
-              m_C_tang_2d_cell(icell, ix, iy) = m_C_2d(ix, iy);
+          for (Int8 iGP = 0; iGP < m_nGP; ++iGP) {
+            for (Int8 ix = 0; ix < 3; ++ix) {
+              for (Int8 iy = 0; iy < 3; ++iy) {
+                m_C_tang_gp(icell, iGP, ix, iy) = m_C_elas_2d(ix, iy);
+              }
             }
           }
         }
@@ -487,28 +487,28 @@ _getMaterialParameters()
           0           0          0          0    2mu  0
           0           0          0          0    0    2mu
       */
-      m_C_3d.fill(0.);
-      m_C_3d(0, 0) = lambda + 2. * mu;
-      m_C_3d(1, 1) = lambda + 2. * mu;
-      m_C_3d(2, 2) = lambda + 2. * mu;
-      m_C_3d(3, 3) = 2 * mu;
-      m_C_3d(4, 4) = 2 * mu;
-      m_C_3d(5, 5) = 2 * mu;
-      m_C_3d(0, 1) = lambda;
-      m_C_3d(1, 0) = lambda;
-      m_C_3d(0, 2) = lambda;
-      m_C_3d(2, 0) = lambda;
-      m_C_3d(1, 2) = lambda;
-      m_C_3d(2, 1) = lambda;
+      m_C_elas_3d.fill(0.);
+      m_C_elas_3d(0, 0) = lambda + 2. * mu;
+      m_C_elas_3d(1, 1) = lambda + 2. * mu;
+      m_C_elas_3d(2, 2) = lambda + 2. * mu;
+      m_C_elas_3d(3, 3) = 2 * mu;
+      m_C_elas_3d(4, 4) = 2 * mu;
+      m_C_elas_3d(5, 5) = 2 * mu;
+      m_C_elas_3d(0, 1) = lambda;
+      m_C_elas_3d(1, 0) = lambda;
+      m_C_elas_3d(0, 2) = lambda;
+      m_C_elas_3d(2, 0) = lambda;
+      m_C_elas_3d(1, 2) = lambda;
+      m_C_elas_3d(2, 1) = lambda;
 
       // Initialize the tangent material tensor
       if (m_gp_material_tensor_strategy == "local") {
-        m_C_tang_3d = m_C_3d;
+        m_C_tang_3d = m_C_elas_3d;
       } else {
         ENUMERATE_ (Cell, icell, allCells()) {
           for (Int8 ix = 0; ix < 6; ++ix) {
             for (Int8 iy = 0; iy < 6; ++iy) {
-              m_C_tang_3d_cell(icell,ix, iy) = m_C_3d(ix, iy);
+              m_C_tang_3d_cell(icell,ix, iy) = m_C_elas_3d(ix, iy);
             }
           }
         }
@@ -578,12 +578,7 @@ _assembleBilinearOperator()
     auto cn_cv = m_connectivity_view.cellNode();
     auto command = makeCommand(acceleratorMng()->defaultQueue());
     auto in_node_coord = Accelerator::viewIn(command, m_node_coord);
-    auto in_C_tang_2d = Accelerator::viewIn(command, m_C_tang_2d_cell);
-    // auto in_C_tang_3d = Accelerator::viewIn(command, m_C_tang_3d_cell); // not implemented
-
-    Real lambda_cell = lambda;
-    Real mu_cell = mu;
-    RealVector<2> hooke_params = {lambda_cell, mu_cell};
+    auto in_C_tang = Accelerator::viewIn(command, m_C_tang_gp);
 
     auto C_tang_3d = m_C_tang_3d;
 
@@ -592,7 +587,7 @@ _assembleBilinearOperator()
       if (m_gp_material_tensor_strategy == "local") {
         ARCANE_FATAL("local GP element matrix assembly strategy not implemented for Tria3 elements");
       } else {
-        m_bsr_format.assembleBilinearAtomic([=] ARCCORE_HOST_DEVICE(CellLocalId cell_lid) { return computeElementMatrixTria3Gpu(cell_lid, cn_cv, in_node_coord, in_C_tang_2d); });
+        m_bsr_format.assembleBilinearAtomic([=] ARCCORE_HOST_DEVICE(CellLocalId cell_lid) { return computeElementMatrixTria3Gpu(cell_lid, cn_cv, in_node_coord, in_C_tang); });
       }
     }
     else {
@@ -604,8 +599,7 @@ _assembleBilinearOperator()
     auto cn_cv = m_connectivity_view.cellNode();
     auto command = makeCommand(acceleratorMng()->defaultQueue());
     auto in_node_coord = Accelerator::viewIn(command, m_node_coord);
-    auto in_C_tang_2d = Accelerator::viewIn(command, m_C_tang_2d_cell);
-    // auto in_C_tang_3d = Accelerator::viewIn(command, m_C_tang_3d_cell); // not implemented
+    auto in_C_tang = Accelerator::viewIn(command, m_C_tang_gp);
 
     Real lambda_cell = lambda;
     Real mu_cell = mu;
@@ -617,7 +611,7 @@ _assembleBilinearOperator()
       if (m_gp_material_tensor_strategy == "local") {
         ARCANE_FATAL("local GP element vector assembly strategy not implemented for Tria3 elements");
       } else {
-        m_bsr_format.assembleBilinearAtomicFree([=] ARCCORE_HOST_DEVICE(CellLocalId cell_lid, Int32 node_lid) { return computeElementVectorTria3Gpu(cell_lid, cn_cv, in_node_coord, in_C_tang_2d, node_lid); });
+        m_bsr_format.assembleBilinearAtomicFree([=] ARCCORE_HOST_DEVICE(CellLocalId cell_lid, Int32 node_lid) { return computeElementVectorTria3Gpu(cell_lid, cn_cv, in_node_coord, in_C_tang, node_lid); });
       }
     } else {
       m_bsr_format.assembleBilinearAtomicFree([=] ARCCORE_HOST_DEVICE(CellLocalId cell_lid, Int32 node_lid) { return computeElementVectorTetra4Gpu(cell_lid, cn_cv, in_node_coord, C_tang_3d, node_lid); });

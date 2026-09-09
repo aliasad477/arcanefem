@@ -31,9 +31,10 @@ inline void FemModuleElastoplasticity::_restoreConvergedStateVonMises()
       m_sigma_2d_gp(cell, iGP, 2) = m_sigma_old_2d_gp(cell, iGP, 2);
     }
 
-    for (Int8 ix = 0; ix < 3; ++ix)
-      for (Int8 iy = 0; iy < 3; ++iy)
-        m_C_tang_2d_cell(cell, ix, iy) = m_C_2d(ix, iy); // set tangent C equal to elastic C
+    for (Int8 iGP = 0; iGP < m_nGP; ++iGP)
+      for (Int8 ix = 0; ix < 3; ++ix)
+        for (Int8 iy = 0; iy < 3; ++iy)
+          m_C_tang_gp(cell, iGP, ix, iy) = m_C_elas_2d(ix, iy); // set tangent C equal to elastic C
   }
 }
 
@@ -98,9 +99,9 @@ inline void FemModuleElastoplasticity::_updateGlobalTangentMaterialTensorVonMise
       Real eps_yy = grad_DU(1, 1);
       Real eps_xy = M_SQRT1_2 * (grad_DU(0, 1) + grad_DU(1, 0));
 
-      Real sigma_trial_xx = m_sigma_old_2d_gp(cell, iGP, 0) + m_C_2d(0, 0) * eps_xx + m_C_2d(0, 1) * eps_yy + m_C_2d(0, 2) * eps_xy;
-      Real sigma_trial_yy = m_sigma_old_2d_gp(cell, iGP, 1) + m_C_2d(1, 0) * eps_xx + m_C_2d(1, 1) * eps_yy + m_C_2d(1, 2) * eps_xy;
-      Real sigma_trial_xy = m_sigma_old_2d_gp(cell, iGP, 2) + m_C_2d(2, 0) * eps_xx + m_C_2d(2, 1) * eps_yy + m_C_2d(2, 2) * eps_xy;
+      Real sigma_trial_xx = m_sigma_old_2d_gp(cell, iGP, 0) + m_C_elas_2d(0, 0) * eps_xx + m_C_elas_2d(0, 1) * eps_yy + m_C_elas_2d(0, 2) * eps_xy;
+      Real sigma_trial_yy = m_sigma_old_2d_gp(cell, iGP, 1) + m_C_elas_2d(1, 0) * eps_xx + m_C_elas_2d(1, 1) * eps_yy + m_C_elas_2d(1, 2) * eps_xy;
+      Real sigma_trial_xy = m_sigma_old_2d_gp(cell, iGP, 2) + m_C_elas_2d(2, 0) * eps_xx + m_C_elas_2d(2, 1) * eps_yy + m_C_elas_2d(2, 2) * eps_xy;
 
       Real sigma_trial_zz = m_sigma_zz_old_2d_gp(cell, iGP) + lambda * (eps_xx + eps_yy);
 
@@ -148,17 +149,17 @@ inline void FemModuleElastoplasticity::_updateGlobalTangentMaterialTensorVonMise
       // _updateTangentMaterialTensorVM();
       Real tangentA = 3.* mu * (3. * mu / (3. * mu + H) - beta);
 
-      m_C_tang_2d_cell(cell, 0, 0) = m_C_2d(0, 0) - tangentA * flowN_xx * flowN_xx - 4. * mu * beta / 3.;
-      m_C_tang_2d_cell(cell, 0, 1) = m_C_2d(0, 1) - tangentA * flowN_xx * flowN_yy + 2. * mu * beta / 3.;
-      m_C_tang_2d_cell(cell, 0, 2) = m_C_2d(0, 2) - tangentA * flowN_xx * flowN_xy;
+      m_C_tang_gp(cell, iGP, 0, 0) = m_C_elas_2d(0, 0) - tangentA * flowN_xx * flowN_xx - 4. * mu * beta / 3.;
+      m_C_tang_gp(cell, iGP, 0, 1) = m_C_elas_2d(0, 1) - tangentA * flowN_xx * flowN_yy + 2. * mu * beta / 3.;
+      m_C_tang_gp(cell, iGP, 0, 2) = m_C_elas_2d(0, 2) - tangentA * flowN_xx * flowN_xy;
 
-      m_C_tang_2d_cell(cell, 1, 0) = m_C_2d(1, 0) - tangentA * flowN_xx * flowN_yy + 2. * mu * beta / 3.;
-      m_C_tang_2d_cell(cell, 1, 1) = m_C_2d(1, 1) - tangentA * flowN_yy * flowN_yy - 4. * mu * beta / 3.;
-      m_C_tang_2d_cell(cell, 1, 2) = m_C_2d(1, 2) - tangentA * flowN_yy * flowN_xy;
+      m_C_tang_gp(cell, iGP, 1, 0) = m_C_elas_2d(1, 0) - tangentA * flowN_xx * flowN_yy + 2. * mu * beta / 3.;
+      m_C_tang_gp(cell, iGP, 1, 1) = m_C_elas_2d(1, 1) - tangentA * flowN_yy * flowN_yy - 4. * mu * beta / 3.;
+      m_C_tang_gp(cell, iGP, 1, 2) = m_C_elas_2d(1, 2) - tangentA * flowN_yy * flowN_xy;
 
-      m_C_tang_2d_cell(cell, 2, 0) = m_C_2d(2, 0) - tangentA * flowN_xx * flowN_xy;
-      m_C_tang_2d_cell(cell, 2, 1) = m_C_2d(2, 1) - tangentA * flowN_yy * flowN_xy;
-      m_C_tang_2d_cell(cell, 2, 2) = m_C_2d(2, 2) - tangentA * flowN_xy * flowN_xy - 2. * mu * beta;
+      m_C_tang_gp(cell, iGP, 2, 0) = m_C_elas_2d(2, 0) - tangentA * flowN_xx * flowN_xy;
+      m_C_tang_gp(cell, iGP, 2, 1) = m_C_elas_2d(2, 1) - tangentA * flowN_yy * flowN_xy;
+      m_C_tang_gp(cell, iGP, 2, 2) = m_C_elas_2d(2, 2) - tangentA * flowN_xy * flowN_xy - 2. * mu * beta;
 
     }
   }
@@ -172,7 +173,7 @@ inline void FemModuleElastoplasticity::_updateGlobalTangentMaterialTensorVonMise
 
   auto command = Accelerator::makeCommand(queue);
 
-  auto in_out_C_tang_2d_cell = Accelerator::viewInOut(command, m_C_tang_2d_cell);
+  auto in_out_C_tang_gp = Accelerator::viewInOut(command, m_C_tang_gp);
   auto in_out_dp_2d_gp = Accelerator::viewInOut(command, m_dp_2d_gp);
   auto in_out_sigma_2d_gp = Accelerator::viewInOut(command, m_sigma_2d_gp);
   auto in_out_sigma_zz_2d_gp = Accelerator::viewInOut(command, m_sigma_zz_2d_gp);
@@ -185,7 +186,7 @@ inline void FemModuleElastoplasticity::_updateGlobalTangentMaterialTensorVonMise
   auto in_DUn = Accelerator::viewIn(command, m_DUn);
 
   auto in_nGP = m_nGP;
-  auto in_C_2d = m_C_2d;
+  auto in_C_elas_2d = m_C_elas_2d;
   auto in_sig0 = sig0;
   auto in_H = H;
   auto in_mu = mu;
@@ -202,11 +203,11 @@ inline void FemModuleElastoplasticity::_updateGlobalTangentMaterialTensorVonMise
       Real eps_yy = grad_DU(1, 1);
       Real eps_xy = 0.70710678118654752440 * (grad_DU(0, 1) + grad_DU(1, 0));
 
-      Real sigma_trial_xx = in_sigma_old_2d_gp(cell_lid, iGP, 0) + in_C_2d(0, 0) * eps_xx + in_C_2d(0, 1) * eps_yy + in_C_2d(0, 2) * eps_xy;
-      Real sigma_trial_yy = in_sigma_old_2d_gp(cell_lid, iGP, 1) + in_C_2d(1, 0) * eps_xx + in_C_2d(1, 1) * eps_yy + in_C_2d(1, 2) * eps_xy;
-      Real sigma_trial_xy = in_sigma_old_2d_gp(cell_lid, iGP, 2) + in_C_2d(2, 0) * eps_xx + in_C_2d(2, 1) * eps_yy + in_C_2d(2, 2) * eps_xy;
+      Real sigma_trial_xx = in_sigma_old_2d_gp(cell_lid, iGP, 0) + in_C_elas_2d(0, 0) * eps_xx + in_C_elas_2d(0, 1) * eps_yy + in_C_elas_2d(0, 2) * eps_xy;
+      Real sigma_trial_yy = in_sigma_old_2d_gp(cell_lid, iGP, 1) + in_C_elas_2d(1, 0) * eps_xx + in_C_elas_2d(1, 1) * eps_yy + in_C_elas_2d(1, 2) * eps_xy;
+      Real sigma_trial_xy = in_sigma_old_2d_gp(cell_lid, iGP, 2) + in_C_elas_2d(2, 0) * eps_xx + in_C_elas_2d(2, 1) * eps_yy + in_C_elas_2d(2, 2) * eps_xy;
 
-      Real sigma_trial_zz = in_sigma_zz_old_2d_gp(cell_lid, iGP) + in_C_2d(0, 1) * eps_yy + in_C_2d(1, 0) * eps_xx;
+      Real sigma_trial_zz = in_sigma_zz_old_2d_gp(cell_lid, iGP) + in_C_elas_2d(0, 1) * eps_yy + in_C_elas_2d(1, 0) * eps_xx;
 
       // Plane strain retains sigma_zz in the three-dimensional deviator.
       Real sigma_trial_mean = (sigma_trial_xx + sigma_trial_yy + sigma_trial_zz) / 3.0;
@@ -252,17 +253,17 @@ inline void FemModuleElastoplasticity::_updateGlobalTangentMaterialTensorVonMise
       // _updateTangentMaterialTensorVM();
       Real tangentA = 3.* in_mu * (3. * in_mu / (3. * in_mu + in_H) - beta);
 
-      in_out_C_tang_2d_cell(cell_lid, 0, 0) = in_C_2d(0, 0) - tangentA * flowN_xx * flowN_xx - 4. * in_mu * beta / 3.;
-      in_out_C_tang_2d_cell(cell_lid, 0, 1) = in_C_2d(0, 1) - tangentA * flowN_xx * flowN_yy + 2. * in_mu * beta / 3.;
-      in_out_C_tang_2d_cell(cell_lid, 0, 2) = in_C_2d(0, 2) - tangentA * flowN_xx * flowN_xy;
+      in_out_C_tang_gp(cell_lid, iGP, 0, 0) = in_C_elas_2d(0, 0) - tangentA * flowN_xx * flowN_xx - 4. * in_mu * beta / 3.;
+      in_out_C_tang_gp(cell_lid, iGP, 0, 1) = in_C_elas_2d(0, 1) - tangentA * flowN_xx * flowN_yy + 2. * in_mu * beta / 3.;
+      in_out_C_tang_gp(cell_lid, iGP, 0, 2) = in_C_elas_2d(0, 2) - tangentA * flowN_xx * flowN_xy;
 
-      in_out_C_tang_2d_cell(cell_lid, 1, 0) = in_C_2d(1, 0) - tangentA * flowN_xx * flowN_yy + 2. * in_mu * beta / 3.;
-      in_out_C_tang_2d_cell(cell_lid, 1, 1) = in_C_2d(1, 1) - tangentA * flowN_yy * flowN_yy - 4. * in_mu * beta / 3.;
-      in_out_C_tang_2d_cell(cell_lid, 1, 2) = in_C_2d(1, 2) - tangentA * flowN_yy * flowN_xy;
+      in_out_C_tang_gp(cell_lid, iGP, 1, 0) = in_C_elas_2d(1, 0) - tangentA * flowN_xx * flowN_yy + 2. * in_mu * beta / 3.;
+      in_out_C_tang_gp(cell_lid, iGP, 1, 1) = in_C_elas_2d(1, 1) - tangentA * flowN_yy * flowN_yy - 4. * in_mu * beta / 3.;
+      in_out_C_tang_gp(cell_lid, iGP, 1, 2) = in_C_elas_2d(1, 2) - tangentA * flowN_yy * flowN_xy;
 
-      in_out_C_tang_2d_cell(cell_lid, 2, 0) = in_C_2d(2, 0) - tangentA * flowN_xx * flowN_xy;
-      in_out_C_tang_2d_cell(cell_lid, 2, 1) = in_C_2d(2, 1) - tangentA * flowN_yy * flowN_xy;
-      in_out_C_tang_2d_cell(cell_lid, 2, 2) = in_C_2d(2, 2) - tangentA * flowN_xy * flowN_xy - 2. * in_mu * beta;
+      in_out_C_tang_gp(cell_lid, iGP, 2, 0) = in_C_elas_2d(2, 0) - tangentA * flowN_xx * flowN_xy;
+      in_out_C_tang_gp(cell_lid, iGP, 2, 1) = in_C_elas_2d(2, 1) - tangentA * flowN_yy * flowN_xy;
+      in_out_C_tang_gp(cell_lid, iGP, 2, 2) = in_C_elas_2d(2, 2) - tangentA * flowN_xy * flowN_xy - 2. * in_mu * beta;
     }
   };
 }

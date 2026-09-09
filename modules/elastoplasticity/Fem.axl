@@ -18,8 +18,8 @@
     <variable field-name="node_coord" name="NodeCoord" data-type="real3" item-kind="node" dim="0">
       <description>Node coordinates from Arcane variable</description>
     </variable>
-    <variable field-name="C_tang_2d_cell" name="CTang2dCell" data-type="real" item-kind="cell" shape-dim="2">
-      <description>Tangent of the material tensor for 2D constitutive law</description>
+    <variable field-name="C_tang_gp" name="CTangGp" data-type="real" item-kind="cell" shape-dim="3">
+      <description>Tangent of the material tensor for constitutive law</description>
     </variable>
     <variable field-name="C_tang_3d_cell" name="CTang3dCell" data-type="real" item-kind="cell" shape-dim="2">
        <description>Tangent of the material tensor for 3D constitutive law</description>
