@@ -35,13 +35,11 @@
       <dirichlet>
         <surface>left</surface>
         <value>0.0 NULL</value>
-        <enforce-Dirichlet-method>RowColumnElimination</enforce-Dirichlet-method>
-      </dirichlet>
+        </dirichlet>
       <dirichlet>
         <surface>bottom</surface>
         <value>NULL 0.0</value>
-        <enforce-Dirichlet-method>RowColumnElimination</enforce-Dirichlet-method>
-      </dirichlet>
+        </dirichlet>
       <traction>
         <surface>inner</surface>
         <traction-input-file>data/traction_quater_cylinder_20steps.txt</traction-input-file>

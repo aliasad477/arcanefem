@@ -362,6 +362,16 @@ _solveNewton()
       }
     }
 
+    if (m_newton_iter ==1) {
+      if (m_constitutive_law == "DruckerPrager") {
+        // --- calculate_residual ---- //
+        VariableDoFReal& residual_values_k(m_linear_system.rhsVariable());
+        _applyZeroRHSOnConstrainedDOFs(residual_values_k, node_dof);
+        m_residual_norm0 = _normL2(residual_values_k, node_dof);
+        info() << "[ArcaneFem-Info] Initial residual norm = " << m_residual_norm0;
+      }
+    }
+
     // --- calculate_and_check_residual ---- //
     _checkNewtonConvergence();
 
@@ -377,13 +387,31 @@ _solveNewton()
         Qlim = 2./math::sqrt(3.) * math::log( Re/Ri) * sig0;
       }
       Real tl = math::sqrt(1.1 / tmax * (t));
-      info() << "[ArcaneFem-Info] At Time Step " << t - 1 << ":\tPressure applied: " << Qlim * tl << "\tNewton iters: " << m_newton_iter << "\tresidual norm: " << m_residual_norm;
-    } else if (m_constitutive_law == "DruckerPrager") {
+      info() << "[ArcaneFem-Info] At Time Step "
+             << t - 1 << ":\tPressure applied: " << Qlim * tl
+             << "\tNewton iters: " << m_newton_iter
+             << "\tResidual norm: " << m_residual_norm;
+    }
+
+    if (m_constitutive_law == "DruckerPrager") {
       if (t == dt) {
         max_settlement = 0.03;
+        footing_width = 1.0;
       }
-      Real tl = t / tmax;
-      info() << "[ArcaneFem-Info] At Time Step " << t - 1 << ":\tPressure applied: " << max_settlement * tl << "\tNewton iters: " << m_newton_iter << "\tresidual norm: " << m_residual_norm;
+
+      VariableDoFReal& algebraic_reaction(m_linear_system.rhsVariable());
+      algebraic_reaction.fill(0.);
+      _applyInternalBodyForce(algebraic_reaction, node_dof);
+
+      alg_reaction = _normL1(residual_values, node_dof);
+      Real normalized_pressure = -alg_reaction / (footing_width * cohesion);
+      Real settlement = t / tmax * max_settlement;
+
+      info() << "[ArcaneFem-Info] At Time Step "
+             << t - 1 << ":\tSettlement: " << settlement
+             << ":\tNormalised pressure: " << normalized_pressure
+             << "\tNewton iters: " << m_newton_iter
+             << "\tResidual norm: " << m_residual_norm;
     }
 
     m_newton_solver_converged = false;
@@ -1065,6 +1093,29 @@ _normL2(VariableDoFReal& u, const IndexedNodeDoFConnectivityView& node_dof) {
   IParallelMng* pm = defaultMesh()->parallelMng();
   l2_norm_u = pm->reduce(Parallel::ReduceSum, l2_norm_u);
   return math::sqrt(l2_norm_u);
+}
+
+inline Real FemModuleElastoplasticity::
+_normL1(VariableDoFReal& u, const IndexedNodeDoFConnectivityView& node_dof) {
+  Real l1_norm_u = 0.0;
+  Int32 mesh_dimension = mesh()->dimension();
+  {
+    ENUMERATE_ (Node, inode, ownNodes()) {
+      Real norm_residual = 0.0;
+      if (mesh_dimension == 2) {
+        norm_residual = u[node_dof.dofId(inode, 0)]
+                      + u[node_dof.dofId(inode, 1)];
+      } else {
+        norm_residual = u[node_dof.dofId(inode, 0)]
+                      + u[node_dof.dofId(inode, 1)]
+                      + u[node_dof.dofId(inode, 2)];
+      }
+      l1_norm_u += norm_residual;
+    }
+  }
+  IParallelMng* pm = defaultMesh()->parallelMng();
+  l1_norm_u = pm->reduce(Parallel::ReduceSum, l1_norm_u);
+  return l1_norm_u;
 }
 
 /*---------------------------------------------------------------------------*/

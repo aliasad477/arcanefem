@@ -112,6 +112,8 @@ class FemModuleElastoplasticity
   Real dpEta; //
   Real dpC; //
   Real max_settlement; // Limiting settlement
+  Real footing_width; // Footing width
+  Real alg_reaction; // Algebraic reaction
   Real m_newton_atol;
   Real m_newton_rtol;
   Real m_residual_norm0 = 0.0;
@@ -193,6 +195,7 @@ class FemModuleElastoplasticity
 
   inline Real _normL2(VariableNodeReal3& u);
   inline Real _normL2(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
+  inline Real _normL1(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectivityView& node_dof);
 
   RealMatrix<6, 6> _computeElementMatrixTria3(Cell cell);
   RealMatrix<12, 12> _computeElementMatrixTetra4(Cell cell);
