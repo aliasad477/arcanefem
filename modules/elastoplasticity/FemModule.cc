@@ -87,11 +87,11 @@ startInit()
     }
   }
 
-  _initConstitutiveLaw();
-
   t = dt;
   tmax = tmax - dt;
   m_global_deltat.assign(dt);
+
+  _initConstitutiveLaw();
 
   _readCaseTables();
 
@@ -154,7 +154,6 @@ compute()
   info() << "[ArcaneFem-Info] mesh nodes " << total_nb_node;
 
   _doStationarySolve();
-  _updateTimeVariables();
   _updateTime();
 
   elapsedTime = platform::getRealTime() - elapsedTime;
@@ -202,6 +201,15 @@ _initConstitutiveLaw()
         nu = drucker_prager->nu(); // Poission ratio ν
         cohesion = drucker_prager->cohesion(); // Cohesion
         friction_angle = drucker_prager->frictionAngle(); // Friction angle
+      }
+
+      BC::IArcaneFemBC* bc = options()->boundaryConditions();
+      for (BC::IManufacturedSolution* bs : bc->manufacturedSolutions()) {
+        if (bs->getManufacturedDirichlet()) {
+          m_prescribed_settlement = make_functor([&](Real a, Real3 b) -> Real {
+                                                return (t / tmax) * max_settlement;
+                                                });
+        }
       }
     } else {
       ARCANE_FATAL("Undefined constitutive law");
@@ -361,26 +369,29 @@ _solveNewton()
         _assembleLinearOperator(); // assembles Residuals(m_DUn) + BCs
       }
     }
-
-    if (m_newton_iter ==1) {
-      if (m_constitutive_law == "DruckerPrager") {
-        // --- calculate_residual ---- //
-        VariableDoFReal& residual_values_k(m_linear_system.rhsVariable());
-        _applyZeroRHSOnConstrainedDOFs(residual_values_k, node_dof);
-        m_residual_norm0 = _normL2(residual_values_k, node_dof);
-        info() << "[ArcaneFem-Info] Initial residual norm = " << m_residual_norm0;
-      }
-    }
+    // if (m_newton_iter ==1) {
+    //   if (m_constitutive_law == "DruckerPrager") {
+    //     // --- calculate_residual ---- //
+    //     VariableDoFReal& residual_values_k(m_linear_system.rhsVariable());
+    //     _applyZeroRHSOnConstrainedDOFs(residual_values_k, node_dof);
+    //     m_residual_norm0 = _normL2(residual_values_k, node_dof);
+    //     info() << "[ArcaneFem-Info] Initial residual norm = " << m_residual_norm0;
+    //   }
+    // }
 
     // --- calculate_and_check_residual ---- //
     _checkNewtonConvergence();
-
   }
 
   if (m_newton_solver_converged) {
     info() << "[ArcaneFem-Info] Newton solver converged after " << m_newton_iter << " iterations.";
+    //-- update global displacement after newton convergence -- //
+    _updateTimeVariables();
 
     if (m_constitutive_law == "VonMises") {
+      //-- commit increment for von mises -- //
+      _commitInternalVariablesVonMises();
+
       if (t == dt) {
         Real Ri = 1.0;
         Real Re = 1.3;
@@ -391,9 +402,15 @@ _solveNewton()
              << t - 1 << ":\tPressure applied: " << Qlim * tl
              << "\tNewton iters: " << m_newton_iter
              << "\tResidual norm: " << m_residual_norm;
+
+
+
     }
 
     if (m_constitutive_law == "DruckerPrager") {
+      // -- commit increment for Drucker Prager --//
+      _commitInternalVariablesDruckerPrager();
+
       if (t == dt) {
         max_settlement = 0.03;
         footing_width = 1.0;
@@ -404,6 +421,7 @@ _solveNewton()
       _applyInternalBodyForce(algebraic_reaction, node_dof);
 
       alg_reaction = _normL1(residual_values, node_dof);
+
       Real normalized_pressure = -alg_reaction / (footing_width * cohesion);
       Real settlement = t / tmax * max_settlement;
 
@@ -412,6 +430,8 @@ _solveNewton()
              << ":\tNormalised pressure: " << normalized_pressure
              << "\tNewton iters: " << m_newton_iter
              << "\tResidual norm: " << m_residual_norm;
+
+
     }
 
     m_newton_solver_converged = false;
@@ -421,13 +441,6 @@ _solveNewton()
   if (m_newton_iter == m_newton_max_iters && !m_newton_solver_converged) {
     info() << "[ArcaneFem-Info] Newton iterations did not converge after maximum (" << m_newton_max_iters << ") iterations";
     ARCANE_FATAL("Newton iterations diverged after max iters");
-  }
-
-  // --- commit_internal_variables ---- //
-  if (m_constitutive_law == "VonMises") {
-    _commitInternalVariablesVonMises();
-  } else if (m_constitutive_law == "DruckerPrager") {
-    _commitInternalVariablesDruckerPrager();
   }
 }
 

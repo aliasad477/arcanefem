@@ -96,6 +96,19 @@ _applyDirichletNewton(VariableDoFReal& rhs_values, const IndexedNodeDoFConnectiv
         }
       }
     }
+    // Manufactured boundary conditions
+    for (BC::IManufacturedSolution* bs : bc->manufacturedSolutions()) {
+      if (bs->getManufacturedDirichlet()) {
+        ARCANE_CHECK_POINTER(m_prescribed_settlement);
+        info() << "Apply prescribed settlement dirichlet condition to all borders";
+        FaceGroup group = bs->getSurface(); // could be avoided if we use node coord to look for bc.
+        if (mesh()->dimension() == 2) {
+          ArcaneFemFunctions::BoundaryConditions2D::applyManufacturedDirichletToLhsAndRhs(m_prescribed_settlement, 0., group, bs, node_dof, m_node_coord, m_linear_system, rhs_values);
+        } else {
+          ArcaneFemFunctions::BoundaryConditions3D::applyManufacturedDirichletToLhsAndRhs(m_prescribed_settlement, 0., group, bs, node_dof, m_node_coord, m_linear_system, rhs_values);
+        }
+      }
+    }
   }
 }
 

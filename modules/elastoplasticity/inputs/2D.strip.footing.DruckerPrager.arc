@@ -19,7 +19,7 @@
   </meshes>
 
   <fem>
-    <tmax>21.</tmax>
+    <tmax>13.</tmax>
     <dt>1.</dt>
     <constitutive-law>
       <law>DruckerPrager</law>
@@ -41,17 +41,15 @@
       <dirichlet>
         <surface>right</surface>
         <value>0.0 NULL</value>
-        <enforce-Dirichlet-method>RowColumnElimination</enforce-Dirichlet-method>
       </dirichlet>
       <dirichlet>
         <surface>bottom</surface>
         <value>NULL 0.0</value>
-        <enforce-Dirichlet-method>RowColumnElimination</enforce-Dirichlet-method>
       </dirichlet>
-      <dirichlet>
+      <manufactured-solution>
         <surface>footing</surface>
-        <dirichlet-input-file>data/dirichlet_strip_footing_12steps.txt</traction-input-file>
-      </dirichlet>
+        <manufactured-dirichlet>true</manufactured-dirichlet>
+      </manufactured-solution>
     </boundary-conditions>
   </fem>
 </case>
